@@ -39,10 +39,45 @@ Python, and never detaches the `uvcvideo` driver.
 
 ## Installation
 
+Every release ships static Linux binaries (no glibc dependency) for
+`x86_64` and `aarch64`, plus packages, on the
+[releases page](https://github.com/illegalstudio/linkctl/releases):
+
+| asset | use |
+|-------|-----|
+| `linkctl_<ver>_linux_amd64.tar.gz`, `..._arm64.tar.gz` | tarball with the binary, LICENSE and README |
+| `linkctl_<ver>_linux_<arch>.pkg.tar.zst` | Arch Linux: `sudo pacman -U <file>` |
+| `linkctl_<ver>_linux_<arch>.deb` | Debian/Ubuntu: `sudo apt install ./<file>` |
+| `linkctl_<ver>_linux_<arch>.rpm` | Fedora/openSUSE: `sudo dnf install ./<file>` |
+| `linkctl_<ver>_checksums.txt` | SHA-256 of every asset |
+| `PKGBUILD` | the `linkctl-bin` AUR package for that release |
+
+### mise
+
+```bash
+mise use -g github:illegalstudio/linkctl@latest
+```
+
+The `ubi` backend works too: `mise use -g ubi:illegalstudio/linkctl`.
+
+### Arch Linux
+
+```bash
+# AUR (binary package, updated by the release workflow)
+paru -S linkctl-bin        # or: yay -S linkctl-bin
+
+# or the package attached to the release
+sudo pacman -U linkctl_<ver>_linux_amd64.pkg.tar.zst
+
+# or build from source with the PKGBUILD in packaging/aur/linkctl
+```
+
+### From source
+
 Requires stable Rust (1.85 or newer) and Linux.
 
 ```bash
-cargo install --path .
+cargo install --path .        # or: make install  (installs to ~/.local/bin)
 ```
 
 For `linkctl preview`, install FFmpeg (`ffplay`) or mpv.
@@ -383,10 +418,26 @@ specification.
 ## Contributing
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test
+make check          # cargo fmt --check, clippy -D warnings, cargo test
+make build          # release binary in bin/linkctl
+make dist           # static musl binary + tar.gz/deb/rpm/pkg.tar.zst in dist/
 ```
+
+`make dist` needs the musl target (`rustup target add x86_64-unknown-linux-musl`)
+and, for the deb/rpm/Arch packages, [nfpm](https://nfpm.goreleaser.com/) on
+`PATH`.
+
+### Releasing
+
+```bash
+make release
+```
+
+proposes the next semver tag, sets `version` in `Cargo.toml`, commits, tags
+and pushes. The tag triggers `.github/workflows/release.yml`, which builds
+and tests both architectures, packages them, creates the GitHub release
+with checksums, and publishes `linkctl-bin` to the AUR when the
+`AUR_SSH_PRIVATE_KEY` repository secret is configured.
 
 Hardware tests are opt-in and never run in CI:
 

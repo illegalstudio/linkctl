@@ -1,0 +1,38 @@
+# nfpm configuration for deb / rpm / Arch packages.
+# Environment: VERSION (e.g. 0.1.0), ARCH (amd64|arm64).
+# scripts/package.sh stages the binary at dist/.stage/linkctl first.
+name: linkctl
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+release: "1"
+section: utils
+priority: optional
+maintainer: Illegal Studio <hello@illegalstudio.it>
+description: |
+  Native Linux command-line control for Insta360 Link webcams.
+  Pan, tilt, zoom, focus, white balance, presets and preview through the
+  kernel V4L2/UVC interfaces. No daemon, no official app, one static binary.
+vendor: Illegal Studio
+homepage: https://github.com/illegalstudio/linkctl
+license: MIT
+
+contents:
+  - src: ./dist/.stage/linkctl
+    dst: /usr/bin/linkctl
+    file_info:
+      mode: 0755
+  - src: ./LICENSE
+    dst: /usr/share/licenses/linkctl/LICENSE
+  - src: ./README.md
+    dst: /usr/share/doc/linkctl/README.md
+  # Shipped as documentation only: linkctl never alters udev rules itself.
+  - src: ./contrib/99-insta360-link.rules
+    dst: /usr/share/doc/linkctl/99-insta360-link.rules
+
+# Soft dependencies for deb/rpm (the Arch packager ignores these; the AUR
+# linkctl-bin package declares them as optdepends instead).
+recommends:
+  - ffmpeg
+suggests:
+  - mpv

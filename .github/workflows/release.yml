@@ -1,0 +1,181 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: build (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            arch: amd64
+          - target: aarch64-unknown-linux-musl
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check that Cargo.toml matches the tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          CARGO="$(grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')"
+          if [ "$TAG" != "$CARGO" ]; then
+            echo "::error::tag v$TAG does not match Cargo.toml version $CARGO (use 'make release')"
+            exit 1
+          fi
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Provides the cross linker for aarch64 and sets CARGO_BUILD_TARGET.
+      - uses: taiki-e/setup-cross-toolchain-action@v1
+        with:
+          target: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Test
+        # aarch64 tests run under qemu-user set up by the toolchain action;
+        # hardware tests are feature-gated and never run here.
+        run: cargo test --locked --release --target ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Verify static binary
+        run: |
+          BIN="target/${{ matrix.target }}/release/linkctl"
+          file "$BIN"
+          if file "$BIN" | grep -q "dynamically linked"; then
+            echo "::error::binary is not static"; exit 1
+          fi
+
+      - name: Install nfpm
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/nfpm"
+          gh release download -R goreleaser/nfpm --pattern 'nfpm_*_Linux_x86_64.tar.gz' \
+            -D "$RUNNER_TEMP/nfpm"
+          tar -C "$RUNNER_TEMP/nfpm" -xzf "$RUNNER_TEMP"/nfpm/nfpm_*_Linux_x86_64.tar.gz nfpm
+          echo "$RUNNER_TEMP/nfpm" >> "$GITHUB_PATH"
+
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          scripts/package.sh "target/${{ matrix.target }}/release/linkctl" "$VERSION" "${{ matrix.arch }}"
+          ls -l dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      sha_amd64: ${{ steps.sums.outputs.sha_amd64 }}
+      sha_arm64: ${{ steps.sums.outputs.sha_arm64 }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: packages-*
+          path: dist
+          merge-multiple: true
+
+      - name: Checksums
+        id: sums
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd dist
+          sha256sum linkctl_* > "linkctl_${VERSION}_checksums.txt"
+          cat "linkctl_${VERSION}_checksums.txt"
+          echo "sha_amd64=$(sha256sum "linkctl_${VERSION}_linux_amd64.tar.gz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "sha_arm64=$(sha256sum "linkctl_${VERSION}_linux_arm64.tar.gz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test the amd64 tarball
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p "$RUNNER_TEMP/smoke"
+          tar -C "$RUNNER_TEMP/smoke" -xzf "dist/linkctl_${VERSION}_linux_amd64.tar.gz"
+          "$RUNNER_TEMP/smoke/linkctl" --version
+          # No camera on the runner: must fail cleanly with exit code 3.
+          set +e
+          "$RUNNER_TEMP/smoke/linkctl" devices --json
+          "$RUNNER_TEMP/smoke/linkctl" status; rc=$?
+          set -e
+          [ "$rc" -eq 3 ] || { echo "::error::expected exit 3, got $rc"; exit 1; }
+
+      - name: Generate PKGBUILD (linkctl-bin)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          scripts/gen-pkgbuild.sh "$VERSION" \
+            "${{ steps.sums.outputs.sha_amd64 }}" \
+            "${{ steps.sums.outputs.sha_arm64 }}" > dist/PKGBUILD
+          cat dist/PKGBUILD
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "linkctl $GITHUB_REF_NAME" \
+            --generate-notes \
+            --verify-tag \
+            dist/*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pkgbuild
+          path: dist/PKGBUILD
+
+  aur:
+    name: publish to AUR (linkctl-bin)
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+    steps:
+      - name: Skip when no AUR key is configured
+        if: env.AUR_SSH_PRIVATE_KEY == ''
+        run: echo "AUR_SSH_PRIVATE_KEY secret not set; skipping AUR publish."
+
+      - uses: actions/checkout@v7
+        if: env.AUR_SSH_PRIVATE_KEY != ''
+
+      - uses: actions/download-artifact@v7
+        if: env.AUR_SSH_PRIVATE_KEY != ''
+        with:
+          name: pkgbuild
+          path: aur
+
+      - uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        if: env.AUR_SSH_PRIVATE_KEY != ''
+        with:
+          pkgname: linkctl-bin
+          pkgbuild: ./aur/PKGBUILD
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_username: illegalstudio-bot
+          commit_email: hello@illegalstudio.it
+          commit_message: "Update to ${{ github.ref_name }}"
+          ssh_keyscan_types: rsa,ecdsa,ed25519

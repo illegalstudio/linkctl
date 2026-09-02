@@ -1,0 +1,39 @@
+# Maintainer: Illegal Studio <hello@illegalstudio.it>
+# Source package: builds linkctl from the tagged release with cargo.
+pkgname=linkctl
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Native Linux command-line control for Insta360 Link webcams"
+arch=('x86_64' 'aarch64')
+url="https://github.com/illegalstudio/linkctl"
+license=('MIT')
+makedepends=('cargo')
+optdepends=('ffmpeg: linkctl preview'
+            'mpv: linkctl preview --player mpv')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  cargo test --frozen --release
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 target/release/linkctl "$pkgdir/usr/bin/linkctl"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 contrib/99-insta360-link.rules \
+    "$pkgdir/usr/share/doc/$pkgname/99-insta360-link.rules"
+}

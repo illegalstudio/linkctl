@@ -4,8 +4,13 @@ CARGO   ?= cargo
 BIN_DIR ?= bin
 BINARY  := $(BIN_DIR)/linkctl
 PREFIX  ?= $(HOME)/.local
+VERSION ?= $(shell grep -m1 '^version = ' Cargo.toml | sed -E 's/version = "(.*)"/\1/')
+# Static musl target used for release artifacts; ARCH is the package name
+# convention (amd64|arm64) used by the release workflow and mise.
+TARGET  ?= $(shell uname -m | sed -e 's/x86_64/x86_64-unknown-linux-musl/' -e 's/aarch64/aarch64-unknown-linux-musl/')
+ARCH    ?= $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
 
-.PHONY: all build debug test lint check install uninstall clean
+.PHONY: all build debug test lint check install uninstall clean dist release
 
 all: build
 
@@ -42,6 +47,19 @@ install: build
 uninstall:
 	rm -f $(PREFIX)/bin/linkctl
 
+## Build the static release binary for this machine and package it into
+## dist/ (tar.gz always; deb/rpm/pkg.tar.zst when nfpm is installed).
+## Same artifacts the release workflow publishes.
+dist:
+	rustup target add $(TARGET)
+	$(CARGO) build --release --locked --target $(TARGET)
+	scripts/package.sh target/$(TARGET)/release/linkctl $(VERSION) $(ARCH)
+
+## Interactive release: propose the next semver tag, bump Cargo.toml,
+## commit, tag and push. The tag triggers .github/workflows/release.yml.
+release:
+	@scripts/release.sh
+
 clean:
 	$(CARGO) clean
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR) dist
