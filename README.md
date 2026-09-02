@@ -39,48 +39,137 @@ Python, and never detaches the `uvcvideo` driver.
 
 ## Installation
 
-Every release ships static Linux binaries (no glibc dependency) for
-`x86_64` and `aarch64`, plus packages, on the
-[releases page](https://github.com/illegalstudio/linkctl/releases):
+Every release publishes static Linux binaries for `x86_64` (`amd64`) and
+`aarch64` (`arm64`). They have no glibc or other runtime dependency, so the
+same binary runs on any distribution. Pick whichever channel fits your
+setup; all of them install a single `linkctl` executable.
 
-| asset | use |
-|-------|-----|
-| `linkctl_<ver>_linux_amd64.tar.gz`, `..._arm64.tar.gz` | tarball with the binary, LICENSE and README |
-| `linkctl_<ver>_linux_<arch>.pkg.tar.zst` | Arch Linux: `sudo pacman -U <file>` |
-| `linkctl_<ver>_linux_<arch>.deb` | Debian/Ubuntu: `sudo apt install ./<file>` |
-| `linkctl_<ver>_linux_<arch>.rpm` | Fedora/openSUSE: `sudo dnf install ./<file>` |
+| channel | command |
+|---------|---------|
+| mise | `mise use -g github:illegalstudio/linkctl@latest` |
+| Arch (AUR) | `paru -S linkctl-bin` |
+| Arch (package file) | `sudo pacman -U linkctl_<ver>_linux_amd64.pkg.tar.zst` |
+| Debian / Ubuntu | `sudo apt install ./linkctl_<ver>_linux_amd64.deb` |
+| Fedora / RHEL | `sudo dnf install ./linkctl_<ver>_linux_amd64.rpm` |
+| openSUSE | `sudo zypper install ./linkctl_<ver>_linux_amd64.rpm` |
+| tarball | `tar xzf linkctl_<ver>_linux_amd64.tar.gz && install -Dm755 linkctl ~/.local/bin/linkctl` |
+| from source | `cargo install --path .` or `make install` |
+
+For `linkctl preview` you also need FFmpeg (`ffplay`) or mpv.
+
+### Release assets
+
+Each release on the
+[releases page](https://github.com/illegalstudio/linkctl/releases) contains:
+
+| asset | content |
+|-------|---------|
+| `linkctl_<ver>_linux_amd64.tar.gz`, `linkctl_<ver>_linux_arm64.tar.gz` | `linkctl`, `LICENSE`, `README.md`, `contrib/99-insta360-link.rules` |
+| `linkctl_<ver>_linux_<arch>.pkg.tar.zst` | Arch Linux package |
+| `linkctl_<ver>_linux_<arch>.deb` | Debian / Ubuntu package |
+| `linkctl_<ver>_linux_<arch>.rpm` | Fedora / RHEL / openSUSE package |
 | `linkctl_<ver>_checksums.txt` | SHA-256 of every asset |
-| `PKGBUILD` | the `linkctl-bin` AUR package for that release |
+| `PKGBUILD` | the `linkctl-bin` AUR recipe for that release |
+
+Replace `amd64` with `arm64` on aarch64 machines (Raspberry Pi 4/5, Apple
+Silicon VMs, Ampere). Verify a download with:
+
+```bash
+sha256sum -c --ignore-missing linkctl_<ver>_checksums.txt
+```
 
 ### mise
 
 ```bash
 mise use -g github:illegalstudio/linkctl@latest
+linkctl --version
 ```
 
-The `ubi` backend works too: `mise use -g ubi:illegalstudio/linkctl`.
+This adds `"github:illegalstudio/linkctl" = "latest"` to
+`~/.config/mise/config.toml` and installs the tarball for your
+architecture. Update later with `mise up`.
+
+mise hides releases published very recently (`minimum_release_age`). If a
+brand-new release is reported as "no versions found matching date filter",
+either wait or bypass the quarantine for that command:
+
+```bash
+MISE_MINIMUM_RELEASE_AGE=0 mise use -g github:illegalstudio/linkctl@latest
+```
+
+To pin a version instead of `latest`: `mise use -g github:illegalstudio/linkctl@0.1.0`.
+The older `ubi:illegalstudio/linkctl` backend also works but mise has
+deprecated it in favour of `github:`.
 
 ### Arch Linux
 
-```bash
-# AUR (binary package, updated by the release workflow)
-paru -S linkctl-bin        # or: yay -S linkctl-bin
+Three options, from most to least automatic:
 
-# or the package attached to the release
+```bash
+# 1. AUR binary package (kept in sync by the release workflow)
+paru -S linkctl-bin          # or: yay -S linkctl-bin
+
+# 2. Package file attached to the release
 sudo pacman -U linkctl_<ver>_linux_amd64.pkg.tar.zst
 
-# or build from source with the PKGBUILD in packaging/aur/linkctl
+# 3. Build from source with makepkg
+git clone https://github.com/illegalstudio/linkctl
+cd linkctl/packaging/aur/linkctl
+makepkg -si
 ```
+
+`linkctl-bin` provides and conflicts with `linkctl`, so you can switch
+between the binary and the source package freely. Both list `ffmpeg` and
+`mpv` as optional dependencies for `linkctl preview`.
+
+### Debian / Ubuntu
+
+```bash
+sudo apt install ./linkctl_<ver>_linux_amd64.deb
+```
+
+The package recommends `ffmpeg` and suggests `mpv`; apt installs
+recommended packages by default unless you pass `--no-install-recommends`.
+
+### Fedora / RHEL / openSUSE
+
+```bash
+sudo dnf install ./linkctl_<ver>_linux_amd64.rpm      # Fedora, RHEL, Rocky, Alma
+sudo zypper install ./linkctl_<ver>_linux_amd64.rpm   # openSUSE
+```
+
+### Tarball (any distribution)
+
+```bash
+curl -LO https://github.com/illegalstudio/linkctl/releases/latest/download/linkctl_<ver>_linux_amd64.tar.gz
+tar xzf linkctl_<ver>_linux_amd64.tar.gz
+install -Dm755 linkctl ~/.local/bin/linkctl        # or /usr/local/bin with sudo
+```
+
+`~/.local/bin` must be on your `PATH`. The tarball also carries the optional
+udev rule under `contrib/` (see [Linux permissions](#linux-permissions)).
 
 ### From source
 
-Requires stable Rust (1.85 or newer) and Linux.
+Requires stable Rust 1.85 or newer.
 
 ```bash
-cargo install --path .        # or: make install  (installs to ~/.local/bin)
+git clone https://github.com/illegalstudio/linkctl
+cd linkctl
+cargo install --path .        # installs to ~/.cargo/bin
+# or
+make install                  # installs to ~/.local/bin (PREFIX=/usr/local for system-wide)
 ```
 
-For `linkctl preview`, install FFmpeg (`ffplay`) or mpv.
+Other Makefile targets: `make build` (release binary in `bin/linkctl`),
+`make debug`, `make test`, `make lint`, `make check`, `make dist` (the same
+static binary and packages the release workflow produces, in `dist/`), and
+`make uninstall`.
+
+All packages install the binary to `/usr/bin/linkctl`, the license to
+`/usr/share/licenses/linkctl/`, and the README plus the optional udev rule
+to `/usr/share/doc/linkctl/`. None of them modifies udev rules, groups or
+ACLs on your system.
 
 ## Quick start
 
