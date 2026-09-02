@@ -39,7 +39,7 @@ Python, and never detaches the `uvcvideo` driver.
 
 ## Installation
 
-Requires stable Rust (1.80 or newer) and Linux.
+Requires stable Rust (1.85 or newer) and Linux.
 
 ```bash
 cargo install --path .

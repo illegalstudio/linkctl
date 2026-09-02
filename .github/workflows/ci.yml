@@ -47,10 +47,10 @@ jobs:
           path: target/aarch64-unknown-linux-gnu/release/linkctl
 
   msrv:
-    name: build (MSRV 1.80)
+    name: build (MSRV 1.85)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.80
+      - uses: dtolnay/rust-toolchain@1.85
       - uses: Swatinem/rust-cache@v2
       - run: cargo build
