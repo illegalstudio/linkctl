@@ -1,0 +1,13 @@
+# Optional udev rule for Insta360 Link cameras.
+#
+# Most desktop distributions already grant the logged-in user access to
+# /dev/video* through systemd-logind's "uaccess" tag, in which case this
+# file is not needed. Use it on headless systems or when running linkctl
+# from a user that is not the active seat owner.
+#
+# Install:  sudo cp contrib/99-insta360-link.rules /etc/udev/rules.d/
+#           sudo udevadm control --reload && sudo udevadm trigger
+#
+# Insta360 Link 2 (validated) and original Link (recognised, untested).
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="2e1a", ATTRS{idProduct}=="4c04", TAG+="uaccess", GROUP="video", MODE="0660"
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="2e1a", ATTRS{idProduct}=="4c01", TAG+="uaccess", GROUP="video", MODE="0660"
