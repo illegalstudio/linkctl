@@ -1,8 +1,33 @@
-# linkctl
+<p align="center">
+  <img src="assets/logo-mark.png" alt="linkctl logo" width="130">
+</p>
 
-Native Linux command-line control for Insta360 Link webcams.
+<h1 align="center">linkctl</h1>
 
-No daemon. No official app. Just one binary.
+<p align="center">
+  <em>Your Insta360 Link, from the Linux terminal.</em>
+</p>
+
+<p align="center">
+  <a href="https://github.com/illegalstudio/linkctl/stargazers"><img src="https://img.shields.io/github/stars/illegalstudio/linkctl?style=flat-square&logo=github&logoColor=white&label=stars&color=FFCC00" alt="Stars"></a>
+  <a href="https://github.com/illegalstudio/linkctl/releases"><img src="https://img.shields.io/github/downloads/illegalstudio/linkctl/total?style=flat-square&logo=github&logoColor=white&label=downloads&color=FFCC00" alt="Downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/illegalstudio/linkctl?style=flat-square&color=FFCC00" alt="License: MIT"></a>
+  <a href="https://x.com/nahime0"><img src="https://img.shields.io/badge/Follow-%40nahime0-FFCC00?style=flat-square&logo=x&logoColor=white" alt="Follow @nahime0 on X"></a>
+</p>
+
+<p align="center">
+  <strong>One binary &middot; No daemon &middot; Native V4L2 &middot; Safe by default</strong>
+</p>
+
+<p align="center">
+  Pan, tilt, zoom, focus, white balance, presets and live preview for Insta360 Link webcams, straight from the shell or a keybinding. linkctl talks to the kernel's V4L2 and UVC interfaces directly, never wakes a camera nobody is using, and ships as a single static binary.
+</p>
+
+<p align="center">
+  <a href="https://opensource.nahi.me"><strong>Official Website</strong></a>
+</p>
+
+---
 
 ```bash
 linkctl status
