@@ -1,0 +1,30 @@
+[package]
+name = "linkctl"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+description = "Native Linux command-line control for Insta360 Link webcams"
+license = "MIT"
+repository = "https://github.com/illegalstudio/linkctl"
+readme = "README.md"
+keywords = ["insta360", "webcam", "v4l2", "uvc", "ptz"]
+categories = ["command-line-utilities", "hardware-support", "multimedia::video"]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "wrap_help"] }
+libc = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+toml = "0.8"
+toml_edit = "0.22"
+
+[features]
+# Opt-in hardware tests. These physically talk to (and may move) a connected
+# camera and are therefore never run by default or in CI.
+hardware-tests = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
