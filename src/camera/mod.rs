@@ -81,9 +81,8 @@ impl Camera {
         }
     }
 
-    /// Write a raw control value after validating it against the control's
-    /// range. Returns the value actually written (clamped/snapped).
-    pub fn set_raw(&self, control: Control, value: i64) -> Result<i64> {
+    /// Validate a raw value for `control` without writing.
+    pub fn check_raw(&self, control: Control, value: i64) -> Result<i64> {
         let info = self.query(control)?;
         if info.is_read_only() {
             return Err(Error::InvalidValue(format!(
@@ -91,10 +90,15 @@ impl Camera {
                 control.name()
             )));
         }
-        let value = info
-            .range()
+        info.range()
             .validate(value, control.name(), "")
-            .map_err(Error::InvalidValue)?;
+            .map_err(Error::InvalidValue)
+    }
+
+    /// Write a raw control value after validating it against the control's
+    /// range. Returns the value actually written (snapped to the step).
+    pub fn set_raw(&self, control: Control, value: i64) -> Result<i64> {
+        let value = self.check_raw(control, value)?;
         let v = i32::try_from(value)
             .map_err(|_| Error::InvalidValue(format!("{value} does not fit a 32-bit control")))?;
         self.dev.set_control(control.id(), v)?;
@@ -135,17 +139,33 @@ impl Camera {
         Ok(units::raw_to_zoom(self.get_raw(Control::ZoomAbsolute)?))
     }
 
+    /// Validate a pan angle against the device range without writing.
+    /// Returns the raw value that would be written.
+    pub fn check_pan_degrees(&self, degrees: f64) -> Result<i64> {
+        self.check_angle(Control::PanAbsolute, "Pan", degrees)
+    }
+
+    pub fn check_tilt_degrees(&self, degrees: f64) -> Result<i64> {
+        self.check_angle(Control::TiltAbsolute, "Tilt", degrees)
+    }
+
     /// Set pan in degrees; out-of-range values are rejected. Returns the
     /// degrees actually applied after snapping to the control step.
     pub fn set_pan_degrees(&self, degrees: f64) -> Result<f64> {
-        self.set_angle(Control::PanAbsolute, "Pan", degrees)
+        let raw = self.check_pan_degrees(degrees)?;
+        self.dev
+            .set_control(Control::PanAbsolute.id(), raw as i32)?;
+        Ok(units::arcsec_to_degrees(raw))
     }
 
     pub fn set_tilt_degrees(&self, degrees: f64) -> Result<f64> {
-        self.set_angle(Control::TiltAbsolute, "Tilt", degrees)
+        let raw = self.check_tilt_degrees(degrees)?;
+        self.dev
+            .set_control(Control::TiltAbsolute.id(), raw as i32)?;
+        Ok(units::arcsec_to_degrees(raw))
     }
 
-    fn set_angle(&self, control: Control, what: &str, degrees: f64) -> Result<f64> {
+    fn check_angle(&self, control: Control, what: &str, degrees: f64) -> Result<i64> {
         let info = self.query(control)?;
         let raw = units::degrees_to_arcsec(degrees);
         let range = info.range();
@@ -157,9 +177,7 @@ impl Camera {
                 units::format_degrees(units::arcsec_to_degrees(range.max)),
             )));
         }
-        let snapped = range.clamp_and_snap(raw);
-        self.dev.set_control(control.id(), snapped as i32)?;
-        Ok(units::arcsec_to_degrees(snapped))
+        Ok(range.clamp_and_snap(raw))
     }
 
     /// Move pan by `delta` degrees relative to the current position,
@@ -184,8 +202,8 @@ impl Camera {
         Ok(units::arcsec_to_degrees(target))
     }
 
-    /// Set zoom as a multiplier (`1.0` .. `4.0` on the Link 2).
-    pub fn set_zoom_factor(&self, zoom: f64) -> Result<f64> {
+    /// Validate a zoom multiplier without writing; returns the raw value.
+    pub fn check_zoom_factor(&self, zoom: f64) -> Result<i64> {
         let info = self.query(Control::ZoomAbsolute)?;
         let raw = units::zoom_to_raw(zoom);
         let range = info.range();
@@ -197,10 +215,15 @@ impl Camera {
                 units::format_zoom(units::raw_to_zoom(range.max)),
             )));
         }
-        let snapped = range.clamp_and_snap(raw);
+        Ok(range.clamp_and_snap(raw))
+    }
+
+    /// Set zoom as a multiplier (`1.0` .. `4.0` on the Link 2).
+    pub fn set_zoom_factor(&self, zoom: f64) -> Result<f64> {
+        let raw = self.check_zoom_factor(zoom)?;
         self.dev
-            .set_control(Control::ZoomAbsolute.id(), snapped as i32)?;
-        Ok(units::raw_to_zoom(snapped))
+            .set_control(Control::ZoomAbsolute.id(), raw as i32)?;
+        Ok(units::raw_to_zoom(raw))
     }
 
     // --- focus / white balance --------------------------------------------

@@ -88,7 +88,11 @@ pub fn run(ctx: &Context, action: PresetAction) -> Result<()> {
                     "No preset named '{name}'. List presets with: linkctl preset list"
                 ))
             })?;
-            let cam = ctx.open_camera_for_control()?;
+            let (cam, _) = ctx.open_validated(|cam| {
+                cam.check_pan_degrees(preset.pan)?;
+                cam.check_tilt_degrees(preset.tilt)?;
+                cam.check_zoom_factor(preset.zoom)
+            })?;
             let applied = Preset {
                 pan: cam.set_pan_degrees(preset.pan)?,
                 tilt: cam.set_tilt_degrees(preset.tilt)?,

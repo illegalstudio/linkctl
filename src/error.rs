@@ -21,6 +21,9 @@ pub enum Error {
     #[error("{0} is not a supported Insta360 Link camera.")]
     UnsupportedDevice(PathBuf),
 
+    #[error("Device {0} does not exist.")]
+    DeviceNotFound(PathBuf),
+
     #[error("Permission denied opening {0}.")]
     PermissionDenied(PathBuf),
 
@@ -73,6 +76,7 @@ impl Error {
             Error::CameraNotFound => ExitCode::CameraNotFound,
             Error::MultipleCameras(_) => ExitCode::MultipleCameras,
             Error::UnsupportedDevice(_) => ExitCode::CameraNotFound,
+            Error::DeviceNotFound(_) => ExitCode::CameraNotFound,
             Error::PermissionDenied(_) => ExitCode::PermissionDenied,
             Error::CameraInactive => ExitCode::CameraInactive,
             Error::UnsupportedControl(_) => ExitCode::UnsupportedControl,
@@ -91,6 +95,7 @@ impl Error {
             Error::CameraNotFound => "camera_not_found",
             Error::MultipleCameras(_) => "multiple_cameras",
             Error::UnsupportedDevice(_) => "unsupported_device",
+            Error::DeviceNotFound(_) => "device_not_found",
             Error::PermissionDenied(_) => "permission_denied",
             Error::CameraInactive => "camera_inactive",
             Error::UnsupportedControl(_) => "unsupported_control",

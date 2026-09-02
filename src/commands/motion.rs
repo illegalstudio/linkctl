@@ -88,7 +88,7 @@ pub fn pan(ctx: &Context, degrees: Option<f64>) -> Result<()> {
             emit_pan_tilt(ctx, Some(pan), None);
         }
         Some(d) => {
-            let cam = ctx.open_camera_for_control()?;
+            let (cam, _) = ctx.open_validated(|cam| cam.check_pan_degrees(d))?;
             let pan = cam.set_pan_degrees(d)?;
             emit_pan_tilt(ctx, Some(pan), None);
         }
@@ -104,7 +104,7 @@ pub fn tilt(ctx: &Context, degrees: Option<f64>) -> Result<()> {
             emit_pan_tilt(ctx, None, Some(tilt));
         }
         Some(d) => {
-            let cam = ctx.open_camera_for_control()?;
+            let (cam, _) = ctx.open_validated(|cam| cam.check_tilt_degrees(d))?;
             let tilt = cam.set_tilt_degrees(d)?;
             emit_pan_tilt(ctx, None, Some(tilt));
         }
@@ -118,7 +118,15 @@ pub fn move_to(ctx: &Context, pan: Option<f64>, tilt: Option<f64>) -> Result<()>
             "move requires --pan and/or --tilt".into(),
         ));
     }
-    let cam = ctx.open_camera_for_control()?;
+    let (cam, _) = ctx.open_validated(|cam| {
+        if let Some(p) = pan {
+            cam.check_pan_degrees(p)?;
+        }
+        if let Some(t) = tilt {
+            cam.check_tilt_degrees(t)?;
+        }
+        Ok(())
+    })?;
     let new_pan = match pan {
         Some(p) => Some(cam.set_pan_degrees(p)?),
         None => None,
@@ -134,7 +142,10 @@ pub fn move_to(ctx: &Context, pan: Option<f64>, tilt: Option<f64>) -> Result<()>
 pub fn zoom(ctx: &Context, factor: Option<f64>) -> Result<()> {
     let zoom = match factor {
         None => ctx.open_camera()?.zoom_factor()?,
-        Some(f) => ctx.open_camera_for_control()?.set_zoom_factor(f)?,
+        Some(f) => {
+            let (cam, _) = ctx.open_validated(|cam| cam.check_zoom_factor(f))?;
+            cam.set_zoom_factor(f)?
+        }
     };
     ctx.out.emit(
         || format!("Zoom: {}", format_zoom(zoom)),

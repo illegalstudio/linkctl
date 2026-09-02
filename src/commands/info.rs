@@ -4,7 +4,6 @@ use super::Context;
 use crate::camera::controls::Control;
 use crate::camera::discovery::{DeviceInfo, NodeRole};
 use crate::camera::insta360::link2::{self, ExtensionUnit};
-use crate::camera::v4l2::ControlInfo;
 use crate::camera::{self, Camera};
 use crate::cli::InfoArgs;
 use crate::error::Result;
@@ -25,11 +24,34 @@ struct ControlJson {
 }
 
 #[derive(Serialize)]
+struct UsbJson<'a> {
+    vendor_id: String,
+    product_id: String,
+    manufacturer: Option<&'a str>,
+    product: Option<&'a str>,
+    serial: Option<&'a str>,
+    bus: Option<u32>,
+    address: Option<u32>,
+    port_path: &'a str,
+    sysfs_path: &'a std::path::Path,
+    driver: Option<&'a str>,
+    driver_version: &'a str,
+}
+
+#[derive(Serialize)]
 struct InfoJson<'a> {
-    #[serde(flatten)]
-    device: &'a DeviceInfo,
+    model: &'a str,
+    model_id: crate::camera::model::Model,
+    tested: bool,
+    device: &'a std::path::Path,
     state: &'static str,
-    kernel_driver_version: &'a str,
+    usb: UsbJson<'a>,
+    control_node: &'a std::path::Path,
+    stream_node: &'a std::path::Path,
+    video_nodes: &'a [crate::camera::discovery::VideoNode],
+    media_node: Option<&'a std::path::Path>,
+    card: &'a str,
+    bus_info: &'a str,
     extension_units: Vec<ExtensionUnit>,
     pan_range_degrees: Option<(f64, f64)>,
     tilt_range_degrees: Option<(f64, f64)>,
@@ -37,6 +59,8 @@ struct InfoJson<'a> {
     supported: Vec<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ai_mode: Option<link2::AiMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ai_mode_payload_len: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     controls: Option<Vec<ControlJson>>,
 }
@@ -87,11 +111,11 @@ pub fn run(ctx: &Context, args: &InfoArgs) -> Result<()> {
         .map(|(_, n)| *n)
         .collect();
 
-    let ai_mode = match link2::read_ai_mode(cam.device()) {
-        Ok(m) => Some(m),
+    let (ai_mode, ai_len) = match link2::read_ai_mode(cam.device()) {
+        Ok((m, len)) => (Some(m), Some(len)),
         Err(e) => {
             ctx.out.debug(format!("AI mode status unavailable: {e}"));
-            None
+            (None, None)
         }
     };
 
@@ -121,15 +145,37 @@ pub fn run(ctx: &Context, args: &InfoArgs) -> Result<()> {
     };
 
     let json = InfoJson {
-        device: info,
+        model: info.model.name(),
+        model_id: info.model,
+        tested: info.model.is_tested(),
+        device: &info.control_node,
         state,
-        kernel_driver_version: &info.driver_version,
+        usb: UsbJson {
+            vendor_id: format!("{:04x}", info.usb.vendor_id),
+            product_id: format!("{:04x}", info.usb.product_id),
+            manufacturer: info.usb.manufacturer.as_deref(),
+            product: info.usb.product.as_deref(),
+            serial: info.usb.serial.as_deref(),
+            bus: info.usb.bus,
+            address: info.usb.address,
+            port_path: &info.usb.port_path,
+            sysfs_path: &info.usb.sysfs_path,
+            driver: info.usb.driver.as_deref(),
+            driver_version: &info.driver_version,
+        },
+        control_node: &info.control_node,
+        stream_node: &info.stream_node,
+        video_nodes: &info.video_nodes,
+        media_node: info.media_node.as_deref(),
+        card: &info.card,
+        bus_info: &info.bus_info,
         extension_units: extension_units.clone(),
         pan_range_degrees: pan_deg,
         tilt_range_degrees: tilt_deg,
         zoom_range: zoom_x,
         supported: supported.clone(),
         ai_mode,
+        ai_mode_payload_len: ai_len,
         controls,
     };
 
@@ -143,7 +189,7 @@ pub fn run(ctx: &Context, args: &InfoArgs) -> Result<()> {
                 tilt_deg,
                 zoom_x,
                 &supported,
-                ai_mode,
+                ai_mode.map(|m| (m, ai_len.unwrap_or(0))),
                 json.controls.as_deref(),
                 &activity,
             )
@@ -162,7 +208,7 @@ fn render(
     tilt: Option<(f64, f64)>,
     zoom: Option<(f64, f64)>,
     supported: &[&str],
-    ai_mode: Option<link2::AiMode>,
+    ai_mode: Option<(link2::AiMode, usize)>,
     controls: Option<&[ControlJson]>,
     activity: &crate::camera::activity::Activity,
 ) -> String {
@@ -281,8 +327,14 @@ fn render(
             ),
         );
     }
-    if let Some(m) = ai_mode {
-        p(&mut o, format!("  AI mode: {}", m.label()));
+    if let Some((m, len)) = ai_mode {
+        p(
+            &mut o,
+            format!(
+                "  AI mode: {} (unit 9 selector 0x02, {len}-byte payload)",
+                m.label()
+            ),
+        );
     }
     if let Some(list) = controls {
         p(&mut o, String::new());
@@ -312,6 +364,3 @@ fn render(
     }
     o.trim_end().to_string()
 }
-
-#[allow(dead_code)]
-fn _assert_control_info_used(_: &ControlInfo) {}

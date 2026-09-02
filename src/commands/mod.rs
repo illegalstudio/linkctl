@@ -59,7 +59,21 @@ impl Context {
         Camera::open(info)
     }
 
-    /// The inactivity guard.
+    /// Open the camera, run `validate` (which may read the device but must
+    /// not write), then apply the inactivity guard. Lets bad arguments fail
+    /// with a precise message even when the camera is inactive.
+    pub fn open_validated<T>(
+        &self,
+        validate: impl FnOnce(&Camera) -> Result<T>,
+    ) -> Result<(Camera, T)> {
+        let cam = self.open_camera()?;
+        let value = validate(&cam)?;
+        self.ensure_active(cam.info())?;
+        Ok((cam, value))
+    }
+
+    /// The inactivity guard. Our own open handles never count as activity
+    /// (the scan skips our pid), so this may run before or after `open`.
     pub fn ensure_active(&self, info: &DeviceInfo) -> Result<()> {
         let activity = camera::check_activity(info);
         self.out.debug(format!(

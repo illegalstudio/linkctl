@@ -63,13 +63,18 @@ pub const AI_TRACKING: XuControl = XuControl {
     name: "ai_tracking",
 };
 
-/// AI mode / status on unit 9, selector 0x02. 61 bytes on the Link 2.
+/// AI mode / status on unit 9, selector 0x02.
 /// Byte 0: 0x00 normal, 0x01 tracking, 0x04 whiteboard, 0x05 overhead,
 /// 0x06 deskview, 0xFF idle/transition. **Read-only in linkctl.**
+///
+/// Length: csmarshall/link-ctl documents 61 bytes on the Link 2; the
+/// development camera (firmware as of 2026-09) reports **60** via `GET_LEN`.
+/// Because the length is firmware-dependent, this control is only ever read
+/// with the device-reported length and is never written.
 pub const AI_MODE_STATUS: XuControl = XuControl {
     unit: XU_INFO_UNIT,
     selector: 0x02,
-    len: 61,
+    len: 60,
     name: "ai_mode_status",
 };
 
@@ -231,10 +236,11 @@ pub fn write_tracking(dev: &V4l2Device, enabled: bool) -> Result<TrackingState> 
     read_tracking(dev)
 }
 
-/// Read byte 0 of the unit-9 AI mode payload. Read-only.
-pub fn read_ai_mode(dev: &V4l2Device) -> Result<AiMode> {
-    let payload = dev.xu_read(&AI_MODE_STATUS)?;
-    Ok(AiMode::from_byte(payload[0]))
+/// Read byte 0 of the unit-9 AI mode payload, using the device-reported
+/// length. Read-only. Returns the decoded mode and the payload length.
+pub fn read_ai_mode(dev: &V4l2Device) -> Result<(AiMode, usize)> {
+    let payload = dev.xu_read_reported(AI_MODE_STATUS.unit, AI_MODE_STATUS.selector)?;
+    Ok((AiMode::from_byte(payload[0]), payload.len()))
 }
 
 #[cfg(test)]
@@ -263,7 +269,7 @@ mod tests {
         assert_eq!(AI_TRACKING.selector, 0x02);
         assert_eq!(AI_TRACKING.len, 1);
         assert_eq!(AI_MODE_STATUS.unit, 9);
-        assert_eq!(AI_MODE_STATUS.len, 61);
+        assert_eq!(AI_MODE_STATUS.len, 60);
     }
 
     #[test]

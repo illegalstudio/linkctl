@@ -121,6 +121,19 @@ impl V4l2Device {
         self.xu_get_cur(ctrl.unit, ctrl.selector, len)
     }
 
+    /// Read a control using the length the *device* reports (`GET_LEN`),
+    /// for read-only diagnostics where the exact length is not critical.
+    /// Never used on the write path.
+    pub fn xu_read_reported(&self, unit: u8, selector: u8) -> Result<Vec<u8>> {
+        let len = self.xu_get_len(unit, selector)?;
+        if len == 0 {
+            return Err(Error::Vendor(format!(
+                "unit {unit} selector 0x{selector:02x} reports a zero-length payload"
+            )));
+        }
+        self.xu_get_cur(unit, selector, len)
+    }
+
     /// `SET_CUR` of a documented control. The payload length is validated
     /// against both the constant and the device's `GET_LEN`, and `GET_INFO`
     /// must advertise SET support. Callers are expected to have produced

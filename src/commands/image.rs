@@ -39,7 +39,7 @@ pub fn focus(ctx: &Context, arg: Option<ModeOrValue>) -> Result<()> {
             (true, cam.try_get_raw(Control::FocusAbsolute)?)
         }
         Some(ModeOrValue::Value(v)) => {
-            let cam = ctx.open_camera_for_control()?;
+            let (cam, _) = ctx.open_validated(|cam| cam.check_raw(Control::FocusAbsolute, v))?;
             let v = cam.set_focus_manual(v)?;
             (false, Some(v))
         }
@@ -76,7 +76,8 @@ pub fn white_balance(ctx: &Context, arg: Option<ModeOrValue>) -> Result<()> {
             (true, cam.try_get_raw(Control::WhiteBalanceTemperature)?)
         }
         Some(ModeOrValue::Value(k)) => {
-            let cam = ctx.open_camera_for_control()?;
+            let (cam, _) =
+                ctx.open_validated(|cam| cam.check_raw(Control::WhiteBalanceTemperature, k))?;
             let k = cam.set_white_balance_temperature(k)?;
             (false, Some(k))
         }
@@ -145,7 +146,10 @@ pub fn simple(ctx: &Context, which: Simple, value: Option<i64>) -> Result<()> {
     let control = which.control();
     let v = match value {
         None => ctx.open_camera()?.get_raw(control)?,
-        Some(v) => ctx.open_camera_for_control()?.set_raw(control, v)?,
+        Some(v) => {
+            let (cam, _) = ctx.open_validated(|cam| cam.check_raw(control, v))?;
+            cam.set_raw(control, v)?
+        }
     };
     let json = serde_json::json!({ which.key(): v });
     ctx.out.emit(|| format!("{}: {v}", which.label()), &json);

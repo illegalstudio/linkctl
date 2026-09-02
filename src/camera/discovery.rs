@@ -288,7 +288,10 @@ pub(crate) fn usb_info_for_interface(iface: &Path) -> Option<UsbInfo> {
 /// unusual device paths still resolve.
 fn sysfs_for_dev(dev_path: &Path) -> Result<PathBuf> {
     use std::os::unix::fs::MetadataExt;
-    let meta = fs::metadata(dev_path).map_err(|e| Error::from_io(e, dev_path, "stat"))?;
+    let meta = fs::metadata(dev_path).map_err(|e| match e.kind() {
+        std::io::ErrorKind::NotFound => Error::DeviceNotFound(dev_path.to_path_buf()),
+        _ => Error::from_io(e, dev_path, "stat"),
+    })?;
     if !is_char(meta.mode()) {
         return Err(Error::UnsupportedDevice(dev_path.to_path_buf()));
     }
