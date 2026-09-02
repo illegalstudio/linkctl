@@ -47,18 +47,35 @@ fn readonly_devices_lists_link2() {
 fn readonly_status_and_info() {
     let out = assert_ok(&["status", "--json"]);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
-    assert!(matches!(v["state"].as_str(), Some("active") | Some("inactive")));
+    assert!(matches!(
+        v["state"].as_str(),
+        Some("active") | Some("inactive")
+    ));
     let out = assert_ok(&["info", "--json"]);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["usb"]["vendor_id"], "2e1a");
     assert!(v["pan_range_degrees"].is_array());
-    assert!(v["extension_units"].as_array().map(|a| a.len()).unwrap_or(0) >= 3);
+    assert!(
+        v["extension_units"]
+            .as_array()
+            .map(|a| a.len())
+            .unwrap_or(0)
+            >= 3
+    );
 }
 
 #[test]
 #[ignore]
 fn readonly_reads_do_not_require_activity() {
-    for cmd in ["pan", "tilt", "zoom", "focus", "wb", "brightness", "tracking"] {
+    for cmd in [
+        "pan",
+        "tilt",
+        "zoom",
+        "focus",
+        "wb",
+        "brightness",
+        "tracking",
+    ] {
         assert_ok(&[cmd]);
     }
 }

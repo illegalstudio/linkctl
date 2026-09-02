@@ -11,6 +11,7 @@
 pub mod activity;
 pub mod controls;
 pub mod discovery;
+pub mod format;
 pub mod insta360;
 pub mod model;
 pub mod v4l2;

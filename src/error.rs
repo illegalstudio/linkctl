@@ -50,6 +50,9 @@ pub enum Error {
 
     #[error("Device disappeared: {0}")]
     DeviceGone(PathBuf),
+
+    #[error("Camera is in use: {0}.")]
+    DeviceBusy(String),
 }
 
 /// Stable exit codes. Keep this list in sync with the README.
@@ -67,6 +70,7 @@ pub enum ExitCode {
     Preview = 10,
     InvalidValue = 11,
     VendorControl = 12,
+    DeviceBusy = 13,
 }
 
 impl Error {
@@ -86,6 +90,7 @@ impl Error {
             Error::Io(_) => ExitCode::DeviceIo,
             Error::Vendor(_) => ExitCode::VendorControl,
             Error::DeviceGone(_) => ExitCode::DeviceIo,
+            Error::DeviceBusy(_) => ExitCode::DeviceBusy,
         }
     }
 
@@ -105,6 +110,7 @@ impl Error {
             Error::Io(_) => "io",
             Error::Vendor(_) => "vendor_control",
             Error::DeviceGone(_) => "device_gone",
+            Error::DeviceBusy(_) => "device_busy",
         }
     }
 
@@ -130,6 +136,9 @@ impl Error {
             }
             Error::CameraNotFound => {
                 Some("Connect an Insta360 Link 2 or pass --device /dev/videoN.".into())
+            }
+            Error::DeviceBusy(_) => {
+                Some("Close the application using the camera and try again.".into())
             }
             _ => None,
         }

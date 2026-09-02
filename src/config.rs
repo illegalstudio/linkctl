@@ -16,8 +16,6 @@ use crate::presets::Preset;
 pub const DEFAULT_STEP_DEGREES: f64 = 5.0;
 /// Default preview player.
 pub const DEFAULT_PREVIEW_PLAYER: &str = "ffplay";
-/// Default preview resolution requested from the camera.
-pub const DEFAULT_PREVIEW_RESOLUTION: &str = "1280x720";
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -28,9 +26,10 @@ pub struct Config {
     /// Player used by `linkctl preview` (`ffplay` or `mpv`).
     #[serde(default = "default_player")]
     pub preview_player: String,
-    /// Resolution requested by the preview (`WIDTHxHEIGHT`).
-    #[serde(default = "default_resolution")]
-    pub preview_resolution: String,
+    /// Resolution requested by the preview (`WIDTHxHEIGHT`). When unset the
+    /// camera's current format (see `linkctl resolution`) is used.
+    #[serde(default)]
+    pub preview_resolution: Option<String>,
     /// Named framing presets.
     #[serde(default)]
     pub presets: BTreeMap<String, Preset>,
@@ -42,16 +41,13 @@ fn default_step() -> f64 {
 fn default_player() -> String {
     DEFAULT_PREVIEW_PLAYER.to_string()
 }
-fn default_resolution() -> String {
-    DEFAULT_PREVIEW_RESOLUTION.to_string()
-}
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             default_step: default_step(),
             preview_player: default_player(),
-            preview_resolution: default_resolution(),
+            preview_resolution: None,
             presets: BTreeMap::new(),
         }
     }
@@ -97,11 +93,12 @@ impl Config {
         if self.preview_player.trim().is_empty() {
             return Err("preview_player must not be empty".into());
         }
-        if parse_resolution(&self.preview_resolution).is_none() {
-            return Err(format!(
-                "preview_resolution must look like WIDTHxHEIGHT (got {:?})",
-                self.preview_resolution
-            ));
+        if let Some(r) = &self.preview_resolution {
+            if parse_resolution(r).is_none() {
+                return Err(format!(
+                    "preview_resolution must look like WIDTHxHEIGHT (got {r:?})"
+                ));
+            }
         }
         for (name, preset) in &self.presets {
             preset

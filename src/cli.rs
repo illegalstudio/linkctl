@@ -47,6 +47,12 @@ pub enum Command {
     /// List connected Insta360 Link cameras
     Devices,
 
+    /// List the pixel formats, resolutions and frame rates the camera offers
+    Formats,
+
+    /// Show or set the camera's current resolution (e.g. 1920x1080@30)
+    Resolution(ResolutionArgs),
+
     /// Recenter the gimbal (pan 0°, tilt 0°)
     Center,
 
@@ -99,6 +105,16 @@ pub struct InfoArgs {
     /// List every V4L2 control with range, default, flags and value
     #[arg(long)]
     pub controls: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ResolutionArgs {
+    /// `WIDTHxHEIGHT` or `WIDTHxHEIGHT@FPS`; omit to show the current format
+    #[arg(value_name = "WxH[@FPS]")]
+    pub spec: Option<String>,
+    /// Pixel format: mjpeg or h264 (default: keep current)
+    #[arg(long, value_name = "FORMAT")]
+    pub format: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -400,6 +416,28 @@ mod tests {
             c.command,
             Command::Info(InfoArgs { controls: true })
         ));
+    }
+
+    #[test]
+    fn formats_and_resolution() {
+        let c = parse(&["formats"]).unwrap();
+        assert!(matches!(c.command, Command::Formats));
+        let c = parse(&["resolution"]).unwrap();
+        assert!(matches!(
+            c.command,
+            Command::Resolution(ResolutionArgs {
+                spec: None,
+                format: None
+            })
+        ));
+        let c = parse(&["resolution", "1920x1080@30", "--format", "mjpeg"]).unwrap();
+        match c.command {
+            Command::Resolution(r) => {
+                assert_eq!(r.spec.as_deref(), Some("1920x1080@30"));
+                assert_eq!(r.format.as_deref(), Some("mjpeg"));
+            }
+            _ => panic!(),
+        }
     }
 
     #[test]

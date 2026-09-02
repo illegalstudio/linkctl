@@ -30,6 +30,8 @@ Python, and never detaches the `uvcvideo` driver.
   ranges, absolute and relative.
 * Focus, white balance, brightness, contrast, saturation, sharpness, hue.
 * Framing presets stored in a TOML config file.
+* Resolution, pixel format (MJPEG/H.264) and frame rate: list what the
+  camera offers and set the default the preview and simple tools will use.
 * `status`, `info`, `devices` with `--json` output for scripting.
 * A safety guard that refuses to move a camera nobody is using.
 * Experimental AI tracking on/off through the vendor extension unit.
@@ -104,7 +106,9 @@ linkctl preview --resolution 1920x1080
 ```
 
 `preview` launches an external player on the camera's streaming node with
-low-latency options (MJPEG at 1280x720 by default) and waits for it to exit.
+low-latency options and waits for it to exit. It uses the camera's current
+pixel format and, unless `--resolution` or `preview_resolution` says
+otherwise, its current size (see `linkctl resolution`).
 It is the intended way to activate the camera. If the player is missing:
 
 ```text
@@ -121,6 +125,8 @@ Only `ffplay` has been validated; `mpv` support is provided but untested.
 linkctl status                 state, pan, tilt, zoom, focus, wb, tracking
 linkctl info [--controls]      USB, nodes, driver, ranges, extension units
 linkctl devices                list Insta360 cameras
+linkctl formats                pixel formats, resolutions and frame rates offered
+linkctl resolution [WxH[@FPS]] [--format mjpeg|h264]   show or set the current format
 
 linkctl center                 pan 0°, tilt 0° (zoom/focus/wb untouched)
 linkctl left|right|up|down [DEGREES]   relative move (default step: 5°)
@@ -184,8 +190,36 @@ In `--json` mode errors are also JSON, on stderr:
 | 10 | preview player missing or failed |
 | 11 | value out of range / invalid |
 | 12 | vendor extension-unit error |
+| 13 | camera busy (format change attempted while another app streams) |
 
 These are stable.
+
+## Resolution and format
+
+```bash
+$ linkctl formats
+MJPG (Motion-JPEG)
+  1920x1080  30 25 24 fps
+* 1280x720   30 25 24 fps
+  3840x2160  30 25 24 fps
+H264 (H.264)
+  ...
+
+$ linkctl resolution
+Resolution: 1280x720 @ 30 fps MJPG
+
+$ linkctl resolution 1920x1080@25
+$ linkctl resolution --format h264 3840x2160
+```
+
+In V4L2 the resolution is negotiated by whichever application opens the
+stream, so this is not a setting stored in the camera. What `resolution`
+sets is the driver's *current* format, which `linkctl preview`, ffplay, mpv
+and most simple tools pick up; browsers and PipeWire negotiate their own.
+Requests are validated against `formats`, so a size or rate the camera does
+not offer is rejected with the list of valid ones. Changing the format does
+not move the gimbal, and while another application is streaming the driver
+refuses it (exit code 13).
 
 ## Presets
 
@@ -219,7 +253,7 @@ the last commanded position, not the physical parked position.
 ```toml
 default_step = 5.0            # degrees for left/right/up/down
 preview_player = "ffplay"     # or "mpv"
-preview_resolution = "1280x720"
+preview_resolution = "1280x720"   # optional; default: the camera's current format
 
 [presets.desk]
 pan = -15.0

@@ -70,6 +70,16 @@ disappears or the camera stops answering until it is unplugged.
 * never resets the USB device;
 * never touches interface 1 or the metadata node for control.
 
+### Format changes
+
+`linkctl resolution` uses `VIDIOC_S_FMT` / `VIDIOC_S_PARM`. These make the
+driver negotiate a format with the camera's streaming interface (a UVC
+probe) but do not start streaming, so the gimbal stays parked; the
+development camera stayed reported as inactive across format changes. The
+driver refuses the change with `EBUSY` while another process streams, which
+`linkctl` reports as "camera is in use" (exit code 13). Requested sizes and
+rates are validated against what the camera enumerates before the ioctl.
+
 ## Inactive camera guard
 
 Every command that changes camera state checks whether another process has

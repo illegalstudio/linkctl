@@ -2,6 +2,7 @@
 //! a [`Result`]; all user-facing rendering goes through [`Output`].
 
 mod devices;
+mod format;
 mod image;
 mod info;
 mod motion;
@@ -114,6 +115,8 @@ pub fn run(cli: Cli) -> Result<()> {
         Command::Status => status::run(&ctx),
         Command::Info(args) => info::run(&ctx, &args),
         Command::Devices => devices::run(&ctx),
+        Command::Formats => format::list(&ctx),
+        Command::Resolution(a) => format::resolution(&ctx, a.spec.as_deref(), a.format.as_deref()),
 
         Command::Center => motion::center(&ctx),
         Command::Left(a) => motion::relative(&ctx, motion::Direction::Left, a.degrees),
@@ -158,18 +161,36 @@ fn preview(
             }
         },
     };
-    let resolution = resolution.unwrap_or_else(|| ctx.config.preview_resolution.clone());
+    // The camera's current format decides the codec and, unless overridden,
+    // the size, so `linkctl resolution` and `preview` agree with each other.
+    let current = Camera::open(info.clone())?.device().current_format()?;
+    let resolution = resolution
+        .or_else(|| ctx.config.preview_resolution.clone())
+        .unwrap_or_else(|| current.resolution());
     if crate::config::parse_resolution(&resolution).is_none() {
         return Err(Error::InvalidValue(format!(
             "resolution must look like WIDTHxHEIGHT (got {resolution:?})"
         )));
     }
+    let input_format = current.fourcc.ffmpeg_name().ok_or_else(|| {
+        Error::Preview(format!(
+            "the camera's current pixel format {} is not supported by the preview; \
+             switch with: linkctl resolution --format mjpeg",
+            current.fourcc
+        ))
+    })?;
     ctx.out.debug(format!(
-        "starting {:?} on {} at {resolution}",
+        "starting {:?} on {} at {resolution} ({input_format})",
         player,
         info.stream_node.display()
     ));
-    let code = crate::preview::run(player, &info.stream_node, info.model.name(), &resolution)?;
+    let code = crate::preview::run(
+        player,
+        &info.stream_node,
+        info.model.name(),
+        &resolution,
+        input_format,
+    )?;
     if code != 0 {
         return Err(Error::Preview(format!(
             "preview player exited with status {code}"

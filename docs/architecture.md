@@ -8,6 +8,7 @@ src/
     mod.rs           Context (config, --force, --device), dispatch, guard
     status.rs  info.rs  devices.rs
     motion.rs        center/left/right/up/down/pan/tilt/move/zoom
+    format.rs        formats / resolution
     image.rs         focus/wb/brightness/contrast/saturation/sharpness/hue
     tracking.rs      vendor AI tracking (experimental)
     preset.rs        preset save/load/list/delete
@@ -19,7 +20,8 @@ src/
   units.rs           degrees<->arcsec, zoom<->raw, Range, relative moves
   camera/
     mod.rs           Camera: open control node, typed get/set helpers
-    v4l2.rs          the only V4L2 ioctl wrappers (unsafe lives here)
+    v4l2.rs          capability/control ioctl wrappers (unsafe lives here)
+    format.rs        ENUM_FMT/FRAMESIZES/FRAMEINTERVALS, G/S_FMT, G/S_PARM
     controls.rs      Control enum with V4L2_CID_* ids and names
     discovery.rs     sysfs + QUERYCAP enumeration, node roles, selection
     activity.rs      /proc fd scan (see activity-detection.md)
@@ -50,11 +52,13 @@ the camera is its purpose.
 
 ## Design decisions
 
-**Direct ioctls instead of the `v4l` crate.** Only five ioctls are needed
-(`QUERYCAP`, `QUERYCTRL`, `G_CTRL`, `S_CTRL`, `UVCIOC_CTRL_QUERY`). Wrapping
-them directly keeps the dependency tree tiny, keeps every `unsafe` block in
-two files with compile-time layout assertions, and avoids abstracting over
-features (buffers, streaming, formats) that a control tool does not use.
+**Direct ioctls instead of the `v4l` crate.** Only a dozen ioctls are
+needed (capabilities, controls, format enumeration/get/set, stream
+parameters, `UVCIOC_CTRL_QUERY`). Wrapping them directly keeps the
+dependency tree tiny, keeps every `unsafe` block in three files
+(`camera/v4l2.rs`, `camera/format.rs`, `camera/insta360/xu.rs`) with
+compile-time layout assertions, and avoids abstracting over buffers and
+streaming, which a control tool does not use.
 
 **Device identity by `st_rdev`, not path.** Discovery maps `--device` paths
 to sysfs through `/sys/dev/char/MAJ:MIN`, and activity detection compares

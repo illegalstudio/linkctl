@@ -17,6 +17,7 @@ pub fn build_command(
     stream_node: &Path,
     title: &str,
     resolution: &str,
+    input_format: &str,
 ) -> Vec<String> {
     let node = stream_node.display().to_string();
     match player {
@@ -30,7 +31,7 @@ pub fn build_command(
             "-f".into(),
             "v4l2".into(),
             "-input_format".into(),
-            "mjpeg".into(),
+            input_format.into(),
             "-video_size".into(),
             resolution.into(),
             "-fflags".into(),
@@ -48,7 +49,7 @@ pub fn build_command(
             "--profile=low-latency".into(),
             "--untimed".into(),
             "--demuxer-lavf-format=v4l2".into(),
-            format!("--demuxer-lavf-o=input_format=mjpeg,video_size={resolution}"),
+            format!("--demuxer-lavf-o=input_format={input_format},video_size={resolution}"),
             format!("--title={title}"),
             format!("av://v4l2:{node}"),
         ],
@@ -64,8 +65,14 @@ pub fn find_in_path(program: &str) -> Option<std::path::PathBuf> {
 }
 
 /// Run the preview and return the player's exit status code.
-pub fn run(player: Player, stream_node: &Path, title: &str, resolution: &str) -> Result<i32> {
-    let argv = build_command(player, stream_node, title, resolution);
+pub fn run(
+    player: Player,
+    stream_node: &Path,
+    title: &str,
+    resolution: &str,
+    input_format: &str,
+) -> Result<i32> {
+    let argv = build_command(player, stream_node, title, resolution, input_format);
     let program = &argv[0];
     if find_in_path(program).is_none() {
         let hint = match player {
@@ -97,6 +104,7 @@ mod tests {
             Path::new("/dev/video0"),
             "Insta360 Link 2",
             "1280x720",
+            "mjpeg",
         );
         assert_eq!(argv[0], "ffplay");
         assert!(argv.windows(2).any(|w| w == ["-f", "v4l2"]));
@@ -105,16 +113,24 @@ mod tests {
             .windows(2)
             .any(|w| w == ["-window_title", "Insta360 Link 2"]));
         assert!(argv.windows(2).any(|w| w == ["-video_size", "1280x720"]));
+        assert!(argv.windows(2).any(|w| w == ["-input_format", "mjpeg"]));
         // Input must come last so option ordering is unambiguous for ffplay.
         assert_eq!(&argv[argv.len() - 2..], ["-i", "/dev/video0"]);
     }
 
     #[test]
     fn mpv_command_shape() {
-        let argv = build_command(Player::Mpv, Path::new("/dev/video4"), "T", "640x480");
+        let argv = build_command(
+            Player::Mpv,
+            Path::new("/dev/video4"),
+            "T",
+            "640x480",
+            "h264",
+        );
         assert_eq!(argv[0], "mpv");
         assert_eq!(argv.last().unwrap(), "av://v4l2:/dev/video4");
         assert!(argv.iter().any(|a| a == "--title=T"));
+        assert!(argv.iter().any(|a| a.contains("input_format=h264")));
     }
 
     #[test]
