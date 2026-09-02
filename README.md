@@ -47,8 +47,7 @@ setup; all of them install a single `linkctl` executable.
 | channel | command |
 |---------|---------|
 | mise | `mise use -g github:illegalstudio/linkctl@latest` |
-| Arch (AUR) | `paru -S linkctl-bin` |
-| Arch (package file) | `sudo pacman -U linkctl_<ver>_linux_amd64.pkg.tar.zst` |
+| Arch Linux | `sudo pacman -U linkctl_<ver>_linux_amd64.pkg.tar.zst` |
 | Debian / Ubuntu | `sudo apt install ./linkctl_<ver>_linux_amd64.deb` |
 | Fedora / RHEL | `sudo dnf install ./linkctl_<ver>_linux_amd64.rpm` |
 | openSUSE | `sudo zypper install ./linkctl_<ver>_linux_amd64.rpm` |
@@ -69,7 +68,7 @@ Each release on the
 | `linkctl_<ver>_linux_<arch>.deb` | Debian / Ubuntu package |
 | `linkctl_<ver>_linux_<arch>.rpm` | Fedora / RHEL / openSUSE package |
 | `linkctl_<ver>_checksums.txt` | SHA-256 of every asset |
-| `PKGBUILD` | the `linkctl-bin` AUR recipe for that release |
+| `PKGBUILD` | binary-package recipe for that release (`makepkg` on Arch) |
 
 Replace `amd64` with `arm64` on aarch64 machines (Raspberry Pi 4/5, Apple
 Silicon VMs, Ampere). Verify a download with:
@@ -103,24 +102,24 @@ deprecated it in favour of `github:`.
 
 ### Arch Linux
 
-Three options, from most to least automatic:
-
 ```bash
-# 1. AUR binary package (kept in sync by the release workflow)
-paru -S linkctl-bin          # or: yay -S linkctl-bin
-
-# 2. Package file attached to the release
+# Package file attached to the release
 sudo pacman -U linkctl_<ver>_linux_amd64.pkg.tar.zst
 
-# 3. Build from source with makepkg
+# Or build the binary package yourself from the release PKGBUILD
+mkdir linkctl-bin && cd linkctl-bin
+curl -LO https://github.com/illegalstudio/linkctl/releases/download/v<ver>/PKGBUILD
+makepkg -si
+
+# Or build from source with makepkg
 git clone https://github.com/illegalstudio/linkctl
 cd linkctl/packaging/aur/linkctl
 makepkg -si
 ```
 
-`linkctl-bin` provides and conflicts with `linkctl`, so you can switch
-between the binary and the source package freely. Both list `ffmpeg` and
-`mpv` as optional dependencies for `linkctl preview`.
+The binary package (`linkctl-bin`) provides and conflicts with `linkctl`, so
+you can switch between it and the source package freely. Both list `ffmpeg`
+and `mpv` as optional dependencies for `linkctl preview`.
 
 ### Debian / Ubuntu
 
@@ -524,9 +523,8 @@ make release
 
 proposes the next semver tag, sets `version` in `Cargo.toml`, commits, tags
 and pushes. The tag triggers `.github/workflows/release.yml`, which builds
-and tests both architectures, packages them, creates the GitHub release
-with checksums, and publishes `linkctl-bin` to the AUR when the
-`AUR_SSH_PRIVATE_KEY` repository secret is configured.
+and tests both architectures, packages them, and creates the GitHub release
+with checksums.
 
 Hardware tests are opt-in and never run in CI:
 
