@@ -175,7 +175,7 @@ jobs:
           pkgname: linkctl-bin
           pkgbuild: ./aur/PKGBUILD
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          commit_username: illegalstudio-bot
-          commit_email: hello@illegalstudio.it
+          commit_username: ${{ vars.AUR_USERNAME || 'illegalstudio' }}
+          commit_email: ${{ vars.AUR_EMAIL || 'hello@illegalstudio.it' }}
           commit_message: "Update to ${{ github.ref_name }}"
           ssh_keyscan_types: rsa,ecdsa,ed25519

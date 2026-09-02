@@ -1,0 +1,51 @@
+name: AUR
+
+# Publish (or re-publish) the linkctl-bin AUR package for an existing
+# GitHub release. The release workflow does this automatically for new
+# tags; this manual entry point is for backfilling a release that was
+# published before the AUR key was configured, or for fixing a botched push.
+#
+#   gh workflow run aur.yml -f version=0.1.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the v prefix (e.g. 0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  aur:
+    name: publish to AUR (linkctl-bin ${{ inputs.version }})
+    runs-on: ubuntu-latest
+    env:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+    steps:
+      - name: Require the AUR key
+        if: env.AUR_SSH_PRIVATE_KEY == ''
+        run: |
+          echo "::error::AUR_SSH_PRIVATE_KEY secret is not set"; exit 1
+
+      - name: Download the release PKGBUILD
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p aur
+          gh release download "v${{ inputs.version }}" --repo "$GITHUB_REPOSITORY" \
+            --pattern PKGBUILD -D aur
+          grep -q "pkgver=${{ inputs.version }}" aur/PKGBUILD
+          cat aur/PKGBUILD
+
+      - uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        with:
+          pkgname: linkctl-bin
+          pkgbuild: ./aur/PKGBUILD
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_username: ${{ vars.AUR_USERNAME || 'illegalstudio' }}
+          commit_email: ${{ vars.AUR_EMAIL || 'hello@illegalstudio.it' }}
+          commit_message: "Update to v${{ inputs.version }}"
+          ssh_keyscan_types: rsa,ecdsa,ed25519
