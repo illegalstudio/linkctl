@@ -67,8 +67,9 @@ struct InfoJson<'a> {
 
 pub fn run(ctx: &Context, args: &InfoArgs) -> Result<()> {
     let info = ctx.device_info()?;
-    let activity = camera::check_activity(&info);
-    let state = if activity.is_active() {
+    // `info` only reports the state string, so the cheap reading suffices.
+    let activity = camera::quick_in_use(&info);
+    let state = if activity.in_use {
         "active"
     } else {
         "inactive"
@@ -191,7 +192,6 @@ pub fn run(ctx: &Context, args: &InfoArgs) -> Result<()> {
                 &supported,
                 ai_mode.map(|m| (m, ai_len.unwrap_or(0))),
                 json.controls.as_deref(),
-                &activity,
             )
         },
         &json,
@@ -210,7 +210,6 @@ fn render(
     supported: &[&str],
     ai_mode: Option<(link2::AiMode, usize)>,
     controls: Option<&[ControlJson]>,
-    activity: &crate::camera::activity::Activity,
 ) -> String {
     let mut o = String::new();
     let p = |o: &mut String, s: String| {
@@ -273,9 +272,6 @@ fn render(
     p(&mut o, String::new());
     p(&mut o, "State".into());
     p(&mut o, format!("  {state}"));
-    for h in &activity.holders {
-        p(&mut o, format!("  used by {} (pid {})", h.comm, h.pid));
-    }
     p(&mut o, String::new());
     p(&mut o, "Controls".into());
     match pan {

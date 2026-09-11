@@ -103,6 +103,12 @@ pub const V4L2_CTRL_FLAG_WRITE_ONLY: u32 = 0x0040;
 pub const V4L2_CTRL_FLAG_VOLATILE: u32 = 0x0080;
 pub const V4L2_CTRL_FLAG_NEXT_CTRL: u32 = 0x8000_0000;
 
+/// Hard ceiling on `VIDIOC_QUERYCTRL` iterations. A well-behaved driver ends
+/// enumeration with `EINVAL` long before this; the cap only exists so a driver
+/// that never terminates cannot spin a core indefinitely. Real devices expose
+/// tens of controls, so 1024 leaves ample headroom.
+const MAX_CONTROLS: usize = 1024;
+
 // --- struct v4l2_control ---------------------------------------------------
 
 #[repr(C)]
@@ -225,13 +231,21 @@ impl V4l2Device {
     pub fn enumerate_controls(&self) -> Result<Vec<ControlInfo>> {
         let mut out = Vec::new();
         let mut id = V4L2_CTRL_FLAG_NEXT_CTRL;
-        loop {
+        let mut previous: Option<u32> = None;
+        for _ in 0..MAX_CONTROLS {
             // SAFETY: zero is a valid bit pattern for this plain-data struct.
             let mut q: V4l2QueryCtrl = unsafe { std::mem::zeroed() };
             q.id = id;
             // SAFETY: VIDIOC_QUERYCTRL takes a `struct v4l2_queryctrl *`.
             match unsafe { self.ioctl(VIDIOC_QUERYCTRL, &mut q) } {
                 Ok(()) => {
+                    // The iteration protocol relies on the driver returning a
+                    // strictly increasing id. A driver that repeats or moves
+                    // backwards would otherwise spin here forever.
+                    if previous.is_some_and(|p| q.id <= p) {
+                        break;
+                    }
+                    previous = Some(q.id);
                     if q.type_ != V4L2_CTRL_TYPE_CTRL_CLASS {
                         out.push(ControlInfo::from_raw(&q));
                     }

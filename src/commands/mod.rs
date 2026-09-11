@@ -76,13 +76,14 @@ impl Context {
     /// The inactivity guard. Our own open handles never count as activity
     /// (the scan skips our pid), so this may run before or after `open`.
     pub fn ensure_active(&self, info: &DeviceInfo) -> Result<()> {
-        let activity = camera::check_activity(info);
+        let activity = camera::is_active(info);
         self.out.debug(format!(
-            "activity: {} holder(s), {} process(es) not inspectable",
-            activity.holders.len(),
-            activity.skipped
+            "activity: in_use={} via {:?}{}",
+            activity.in_use,
+            activity.detection,
+            if activity.partial { " (partial)" } else { "" }
         ));
-        if activity.is_active() {
+        if activity.in_use {
             return Ok(());
         }
         if self.force {
@@ -112,7 +113,7 @@ pub fn run(cli: Cli) -> Result<()> {
     };
 
     match cli.command {
-        Command::Status => status::run(&ctx),
+        Command::Status(a) => status::run(&ctx, &a),
         Command::Info(args) => info::run(&ctx, &args),
         Command::Devices => devices::run(&ctx),
         Command::Formats => format::list(&ctx),

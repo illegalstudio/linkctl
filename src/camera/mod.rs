@@ -272,7 +272,86 @@ pub fn activity_ids(info: &DeviceInfo) -> Vec<activity::DeviceId> {
     ids
 }
 
-/// Scan for activity on the given camera (without opening it).
+/// Scan for activity on the given camera (without opening it), collecting
+/// every holder. This is the exact but expensive answer; see
+/// [`activity::SCAN_BUDGET`].
 pub fn check_activity(info: &DeviceInfo) -> activity::Activity {
-    activity::scan(&activity_ids(info), std::process::id())
+    activity::scan_exhaustive(&activity_ids(info), std::process::id())
+}
+
+/// How the in-use answer was obtained, so callers can report it honestly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Detection {
+    /// USB runtime-PM state: the whole device is powered up for use by
+    /// something (video *or* the built-in microphone). Cheap, O(1).
+    DeviceInUse,
+    /// `/proc` scan: a process holds one of this camera's video nodes open.
+    /// Exact, but O(file descriptors open on the machine).
+    Holders,
+}
+
+/// Result of an in-use check.
+#[derive(Debug, Clone)]
+pub struct InUse {
+    pub in_use: bool,
+    pub detection: Detection,
+    /// The scan gave up early; `in_use == false` is then "not proven", not
+    /// "proven idle".
+    pub partial: bool,
+}
+
+/// Cheap in-use check for the polled path.
+///
+/// Prefers the O(1) sysfs reading and falls back to a full scan only when
+/// sysfs cannot answer. Note the semantics differ — see
+/// [`activity::usb_device_in_use`] — so this must not be used as the guard
+/// for commands that write to the camera; use [`is_active`] for that.
+pub fn quick_in_use(info: &DeviceInfo) -> InUse {
+    if let Some(in_use) = activity::usb_device_in_use(&info.usb.sysfs_path) {
+        return InUse {
+            in_use,
+            detection: Detection::DeviceInUse,
+            partial: false,
+        };
+    }
+    let activity = any_holder(info);
+    InUse {
+        in_use: activity.is_active(),
+        detection: Detection::Holders,
+        partial: activity.partial,
+    }
+}
+
+/// Exact in-use check: is any process holding one of the camera's nodes open?
+///
+/// Takes the sysfs short-circuit only in the *positive* direction. If the USB
+/// device is powered up, something is using it and the guard has no reason to
+/// object, so the scan is skipped. A suspended device proves nothing (a node
+/// can be open without streaming), so that case still scans.
+pub fn is_active(info: &DeviceInfo) -> InUse {
+    if activity::usb_device_in_use(&info.usb.sysfs_path) == Some(true) {
+        return InUse {
+            in_use: true,
+            detection: Detection::DeviceInUse,
+            partial: false,
+        };
+    }
+    let activity = any_holder(info);
+    InUse {
+        in_use: activity.is_active(),
+        detection: Detection::Holders,
+        partial: activity.partial,
+    }
+}
+
+/// Scan that stops at the first holder found.
+fn any_holder(info: &DeviceInfo) -> activity::Activity {
+    activity::scan_with(
+        Path::new("/proc"),
+        &activity_ids(info),
+        std::process::id(),
+        activity::ScanGoal::AnyHolder,
+        Some(activity::SCAN_BUDGET),
+    )
 }

@@ -39,7 +39,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Show camera state and current framing
-    Status,
+    Status(StatusArgs),
 
     /// Show detailed device and control information
     Info(InfoArgs),
@@ -98,6 +98,14 @@ pub enum Command {
 
     /// Open a live preview (this intentionally activates the camera)
     Preview(PreviewArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct StatusArgs {
+    /// List the processes holding the camera open. Requires scanning every
+    /// open file descriptor on the machine, which is slow on busy systems.
+    #[arg(long)]
+    pub holders: bool,
 }
 
 #[derive(Debug, Args)]

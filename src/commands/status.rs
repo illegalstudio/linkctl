@@ -5,6 +5,7 @@ use crate::camera::activity::Holder;
 use crate::camera::controls::Control;
 use crate::camera::insta360::link2;
 use crate::camera::{self, Camera};
+use crate::cli::StatusArgs;
 use crate::error::Result;
 use crate::units::{format_degrees, format_zoom};
 
@@ -39,12 +40,34 @@ struct StatusJson<'a> {
     tracking: Option<bool>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     used_by: Vec<Holder>,
+    /// How `state` was determined. `device-in-use` covers the whole USB
+    /// device (video or microphone); `holders` means a process was found
+    /// holding a video node open.
+    detection: camera::Detection,
+    /// The holder scan hit its time budget, so `inactive` means "no holder
+    /// found in time" rather than "proven idle".
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    partial: bool,
 }
 
-pub fn run(ctx: &Context) -> Result<()> {
+pub fn run(ctx: &Context, args: &StatusArgs) -> Result<()> {
     let info = ctx.device_info()?;
-    let activity = camera::check_activity(&info);
-    let active = activity.is_active();
+    // Without `--holders` the cheap USB-level reading is enough, and keeps a
+    // polled `status` off the O(all file descriptors) scan path.
+    let (check, holders) = if args.holders {
+        let scan = camera::check_activity(&info);
+        (
+            camera::InUse {
+                in_use: scan.is_active(),
+                detection: camera::Detection::Holders,
+                partial: scan.partial,
+            },
+            scan.holders,
+        )
+    } else {
+        (camera::quick_in_use(&info), Vec::new())
+    };
+    let active = check.in_use;
     let model = info.model.name();
     let device = info.control_node.clone();
 
@@ -60,6 +83,8 @@ pub fn run(ctx: &Context) -> Result<()> {
             white_balance: None,
             tracking: None,
             used_by: Vec::new(),
+            detection: check.detection,
+            partial: check.partial,
         };
         ctx.out.emit(
             || {
@@ -73,6 +98,18 @@ pub fn run(ctx: &Context) -> Result<()> {
         return Ok(());
     }
 
+    let used_by_line = if holders.is_empty() {
+        None
+    } else {
+        Some(
+            holders
+                .iter()
+                .map(|h| format!("{} ({})", h.comm, h.pid))
+                .collect::<Vec<_>>()
+                .join(", "),
+        )
+    };
+
     let cam = Camera::open(info)?;
     let s = read_state(&cam, ctx);
     let json = StatusJson {
@@ -85,7 +122,9 @@ pub fn run(ctx: &Context) -> Result<()> {
         focus: s.focus.map(|(auto, value)| FocusJson { auto, value }),
         white_balance: s.wb.map(|(auto, temperature)| WbJson { auto, temperature }),
         tracking: s.tracking,
-        used_by: activity.holders.clone(),
+        used_by: holders,
+        detection: check.detection,
+        partial: check.partial,
     };
     ctx.out.emit(
         || {
@@ -129,13 +168,7 @@ pub fn run(ctx: &Context) -> Result<()> {
                     if t { "On" } else { "Off" }
                 ));
             }
-            if ctx.out.verbose && !activity.holders.is_empty() {
-                let who = activity
-                    .holders
-                    .iter()
-                    .map(|h| format!("{} ({})", h.comm, h.pid))
-                    .collect::<Vec<_>>()
-                    .join(", ");
+            if let Some(who) = &used_by_line {
                 lines.push(format!("Used by:       {who}"));
             }
             lines.join("\n")
