@@ -49,14 +49,21 @@ impl Camera {
 
     /// Query a control's metadata; `UnsupportedControl` if absent.
     pub fn query(&self, control: Control) -> Result<ControlInfo> {
-        self.dev
-            .query_control(control.id())?
+        self.try_query(control)?
             .ok_or(Error::UnsupportedControl(control.name()))
     }
 
     /// Query a control, returning `None` if unsupported.
     pub fn try_query(&self, control: Control) -> Result<Option<ControlInfo>> {
+        if self.is_absent_gimbal_control(control) {
+            return Ok(None);
+        }
         self.dev.query_control(control.id())
+    }
+
+    fn is_absent_gimbal_control(&self, control: Control) -> bool {
+        !self.info.model.has_gimbal()
+            && matches!(control, Control::PanAbsolute | Control::TiltAbsolute)
     }
 
     pub fn supports(&self, control: Control) -> bool {
@@ -65,6 +72,9 @@ impl Camera {
 
     /// Read a raw control value.
     pub fn get_raw(&self, control: Control) -> Result<i64> {
+        if self.is_absent_gimbal_control(control) {
+            return Err(Error::UnsupportedControl(control.name()));
+        }
         match self.dev.get_control(control.id()) {
             Ok(v) => Ok(v as i64),
             Err(Error::Io(msg)) if msg.contains("EINVAL") || msg.contains("Invalid argument") => {
