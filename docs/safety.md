@@ -35,18 +35,20 @@ on the same video node. This has three consequences:
 * other applications keep working while `linkctl` talks to the camera;
 * the driver serialises our requests with regular control traffic.
 
-Only one vendor control is written today: AI tracking on/off
-(unit 11, selector 0x02, 1 byte). Every vendor write goes through
-`V4l2Device::xu_write`, which requires a static `XuControl` descriptor and
-enforces, in order:
+Two vendor controls are written: AI tracking on/off (unit 11, selector
+0x02, 1 byte) and Link 2C digital framing (unit 10, selector 0x13, 8 bytes;
+see `link2c-framing.md`). Every vendor write goes through
+`V4l2Device::xu_write`, which requires a static `XuControl` descriptor.
+The write path and its callers enforce:
 
 1. the payload length equals the documented constant;
 2. the device's `GET_LEN` equals the documented constant;
 3. the device's `GET_INFO` advertises SET support;
 4. the unit id carries the expected GUID in the USB descriptors
-   (checked by the `tracking` command before any write);
-5. the payload was obtained by reading the current value first
-   (read-modify-write);
+   (checked by the tracking/framing code before any write);
+5. the payload preserves current values: tracking uses read-modify-write;
+   framing preserves unspecified coordinates from unit 9 mode-state readback
+   and zoom from V4L2, then encodes the fully documented Host PTZ payload;
 6. the value is read back afterwards and a mismatch is reported.
 
 Read-only vendor queries (`GET_LEN`, `GET_INFO`, `GET_CUR`) are used for
@@ -94,7 +96,8 @@ explicitly. Read commands and `preview` are always allowed.
 * writes to unknown selectors, units or payload lengths;
 * generic extension-unit scanning or fuzzing;
 * writes to the 60/61-byte AI mode payload (unit 9, selector 0x02);
-* constructing vendor payloads from scratch when a read is possible;
+* constructing vendor payloads with unknown fields or discarding unspecified
+  user settings;
 * detaching the kernel driver or resetting the USB device;
 * changing udev rules, groups or ACLs on the user's behalf;
 * installing software (e.g. FFmpeg for `preview`).

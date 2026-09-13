@@ -47,12 +47,47 @@ Python, and never detaches the `uvcvideo` driver.
 | model | USB id | status |
 |-------|--------|--------|
 | Insta360 Link 2 | `2e1a:4c04` | validated on real hardware |
+| Insta360 Link 2C | `2e1a:4c03` | image controls and zoom; experimental digital framing; no motorized pan/tilt |
 | Insta360 Link (original) | `2e1a:4c01` | recognised, **not tested** |
+
+### Link 2C digital framing
+
+Link 2C has no gimbal. Use `frame` to move its digital crop rather than
+`pan`, `tilt`, `left`, `right`, `up`, `down`, `move`, or `center`. Those
+motor commands, and saving/loading pan/tilt presets, are unsupported on 2C.
+
+```sh
+linkctl frame                         # read crop center and zoom
+linkctl frame --zoom 2 --x 0.5 --y 0.5 # 2x zoom, centered
+linkctl frame --x 0.6                 # change X; preserve Y and zoom
+linkctl frame --y 0.4                 # change Y; preserve X and zoom
+linkctl frame --center                # recenter without changing zoom
+linkctl frame --json                  # normalized x/y and zoom multiplier
+```
+
+Coordinates are normalized from 0 to 1, with 0.5 at the center; they are
+not degrees. Zoom ranges from 1 to 4. At 1x there is no room to move the
+crop, and firmware may clamp positions near the edges when zoomed in.
+Writes require an active stream (or explicit `--force`) and validate the
+extension-unit GUID, eight-byte payload length, and SET capability. Only
+normal/tracking/Auto Framing mode-state layouts are decoded. Other modes
+or idle firmware may report that framing state is unavailable.
+
+Output reports readback, not merely the requested values, with a warning
+if the camera has not confirmed the change. Auto Framing can override manual
+positioning; disable it if the crop will not stay where requested.
+
+Detection, coordinate readback, and command length/capability queries have
+been verified on a physical Link 2C. Digital framing writes have also been
+confirmed working by the camera owner in manual testing. Edge clamping,
+direction polarity, and interaction with Auto Framing still need broader
+validation. See [protocol details](docs/link2c-framing.md).
 
 ## Features
 
 * Pan, tilt, zoom in human units (degrees, zoom factor) with device-reported
   ranges, absolute and relative.
+* Experimental Link 2C digital crop positioning with `frame --x/--y/--zoom`.
 * Focus, white balance, brightness, contrast, saturation, sharpness, hue.
 * Framing presets stored in a TOML config file.
 * Resolution, pixel format (MJPEG/H.264) and frame rate: list what the
@@ -282,6 +317,7 @@ linkctl pan [DEGREES]          absolute pan, negative = left; no arg reads
 linkctl tilt [DEGREES]         absolute tilt, negative = down; no arg reads
 linkctl move --pan 30 --tilt -10
 
+linkctl frame [--x X --y Y --zoom FACTOR | --center]  Link 2C digital crop
 linkctl zoom [FACTOR]          1 .. 4 on the Link 2
 linkctl focus auto|VALUE
 linkctl wb auto|KELVIN
@@ -482,7 +518,9 @@ Check your device permissions or group membership.
 
 * Standard V4L2 controls are the normal path and are validated against the
   device's own ranges.
-* Vendor writes are limited to one documented, reversible, 1-byte control
+* Vendor writes are limited to documented AI tracking and Link 2C digital
+  framing controls; see [protocol details](docs/link2c-framing.md).
+* The AI tracking write is a reversible, 1-byte control
   and go through read → validate (`GET_LEN`, `GET_INFO`, GUID) → write →
   read-back.
 * The kernel driver is never detached; libusb is not used at all.

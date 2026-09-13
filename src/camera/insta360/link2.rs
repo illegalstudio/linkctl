@@ -50,7 +50,6 @@ pub mod guid {
 /// Extension unit ids as enumerated by the Link 2 descriptor. These are the
 /// *expected* ids; [`resolve_units`] confirms them against the descriptor.
 pub const XU_INFO_UNIT: u8 = 9;
-#[allow(dead_code)] // documented for completeness; nothing on unit 10 is used yet
 pub const XU_IMAGE_UNIT: u8 = 10;
 pub const XU_AI_UNIT: u8 = 11;
 
@@ -65,7 +64,7 @@ pub const AI_TRACKING: XuControl = XuControl {
 
 /// AI mode / status on unit 9, selector 0x02.
 /// Byte 0: 0x00 normal, 0x01 tracking, 0x04 whiteboard, 0x05 overhead,
-/// 0x06 deskview, 0xFF idle/transition. **Read-only in linkctl.**
+/// 0x06 deskview, 0x07 auto framing, 0xFF idle/transition. **Read-only in linkctl.**
 ///
 /// Length: csmarshall/link-ctl documents 61 bytes on the Link 2; the
 /// development camera (firmware as of 2026-09) reports **60** via `GET_LEN`.
@@ -87,6 +86,7 @@ pub enum AiMode {
     Whiteboard,
     Overhead,
     DeskView,
+    AutoFraming,
     Idle,
     Unknown(u8),
 }
@@ -99,6 +99,7 @@ impl AiMode {
             0x04 => AiMode::Whiteboard,
             0x05 => AiMode::Overhead,
             0x06 => AiMode::DeskView,
+            0x07 => AiMode::AutoFraming,
             0xFF => AiMode::Idle,
             other => AiMode::Unknown(other),
         }
@@ -111,6 +112,7 @@ impl AiMode {
             AiMode::Whiteboard => "whiteboard".into(),
             AiMode::Overhead => "overhead".into(),
             AiMode::DeskView => "deskview".into(),
+            AiMode::AutoFraming => "auto framing".into(),
             AiMode::Idle => "idle".into(),
             AiMode::Unknown(b) => format!("unknown (0x{b:02x})"),
         }

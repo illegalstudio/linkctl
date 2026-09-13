@@ -8,6 +8,7 @@
 # Install:  sudo cp contrib/99-insta360-link.rules /etc/udev/rules.d/
 #           sudo udevadm control --reload && sudo udevadm trigger
 #
-# Insta360 Link 2 (validated) and original Link (recognised, untested).
+# Insta360 Link 2, Link 2C, and original Link (recognised, untested).
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="2e1a", ATTRS{idProduct}=="4c03", TAG+="uaccess", GROUP="video", MODE="0660"
 SUBSYSTEM=="video4linux", ATTRS{idVendor}=="2e1a", ATTRS{idProduct}=="4c04", TAG+="uaccess", GROUP="video", MODE="0660"
 SUBSYSTEM=="video4linux", ATTRS{idVendor}=="2e1a", ATTRS{idProduct}=="4c01", TAG+="uaccess", GROUP="video", MODE="0660"
