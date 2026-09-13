@@ -5,4 +5,5 @@
 //! Units. See `docs/research.md` and `docs/safety.md`.
 
 pub mod link2;
+pub mod link2c;
 pub mod xu;
