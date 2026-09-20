@@ -35,12 +35,12 @@ fn emit(ctx: &Context, state: link2::TrackingState, warning: Option<String>) {
     );
 }
 
-/// Make sure the device really is a Link 2 whose unit 11 carries the AI GUID.
+/// Make sure the device really is a Link 2 / 2C whose unit 11 carries the AI GUID.
 fn check_unit(cam: &Camera) -> Result<()> {
     let info = cam.info();
-    if info.model != Model::Link2 {
+    if !matches!(info.model, Model::Link2 | Model::Link2C) {
         return Err(Error::Vendor(format!(
-            "tracking is only implemented for the Insta360 Link 2 (found {})",
+            "tracking is only implemented for the Insta360 Link 2 / Link 2C (found {})",
             info.model
         )));
     }
