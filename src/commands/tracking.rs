@@ -4,7 +4,6 @@ use serde::Serialize;
 
 use super::Context;
 use crate::camera::insta360::link2::{self, guid, XU_AI_UNIT};
-use crate::camera::model::Model;
 use crate::camera::Camera;
 use crate::cli::TrackingAction;
 use crate::error::{Error, Result};
@@ -35,12 +34,12 @@ fn emit(ctx: &Context, state: link2::TrackingState, warning: Option<String>) {
     );
 }
 
-/// Make sure the device really is a Link 2 whose unit 11 carries the AI GUID.
+/// Require a Link 2-compatible model whose unit 11 carries the AI GUID.
 fn check_unit(cam: &Camera) -> Result<()> {
     let info = cam.info();
-    if info.model != Model::Link2 {
+    if !info.model.supports_link2_protocol() {
         return Err(Error::Vendor(format!(
-            "tracking is only implemented for the Insta360 Link 2 (found {})",
+            "tracking is only implemented for the Insta360 Link 2 and Link 2C (found {})",
             info.model
         )));
     }
