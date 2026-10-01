@@ -136,8 +136,9 @@ impl V4l2Device {
 
     /// `SET_CUR` of a documented control. The payload length is validated
     /// against both the constant and the device's `GET_LEN`, and `GET_INFO`
-    /// must advertise SET support. Callers are expected to have produced
-    /// `payload` by read-modify-write of [`V4l2Device::xu_read`].
+    /// must advertise SET support. Callers preserve unknown fields with
+    /// read-modify-write, or construct a fully documented command payload
+    /// (e.g. Link 2C Host PTZ, whose readback lives on a different selector).
     pub fn xu_write(&self, ctrl: &XuControl, payload: &[u8]) -> Result<()> {
         if payload.len() != usize::from(ctrl.len) {
             return Err(Error::Vendor(format!(

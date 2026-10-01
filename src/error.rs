@@ -118,6 +118,9 @@ impl Error {
     pub fn hint(&self) -> Option<String> {
         match self {
             Error::CameraInactive => Some("Start a preview with:\n  linkctl preview".into()),
+            Error::UnsupportedControl("pan_absolute" | "tilt_absolute") => Some(
+                "Link 2C has no motorized gimbal. Use 'linkctl frame --x 0.5 --y 0.5' for digital framing.".into(),
+            ),
             Error::PermissionDenied(_) => {
                 Some("Check your device permissions or group membership.".into())
             }

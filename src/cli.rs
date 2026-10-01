@@ -72,6 +72,9 @@ pub enum Command {
     /// Set pan and/or tilt absolutely in one command
     Move(MoveArgs),
 
+    /// Show or set Link 2C digital framing (normalized crop center, not degrees)
+    Frame(FrameArgs),
+
     /// Set zoom multiplier (e.g. 1, 1.5, 2, 4); omit to read
     Zoom(ZoomArg),
     /// Set focus: `auto` or a manual value; omit to read
@@ -147,6 +150,38 @@ pub struct MoveArgs {
     /// Absolute tilt in degrees
     #[arg(long, allow_negative_numbers = true, value_parser = parse_degrees)]
     pub tilt: Option<f64>,
+}
+
+#[derive(Debug, Args)]
+pub struct FrameArgs {
+    /// Horizontal crop center, 0..1; omit to preserve
+    #[arg(long, allow_negative_numbers = true, value_parser = parse_coordinate)]
+    pub x: Option<f64>,
+    /// Vertical crop center, 0..1; omit to preserve
+    #[arg(long, allow_negative_numbers = true, value_parser = parse_coordinate)]
+    pub y: Option<f64>,
+    /// Zoom multiplier, 1..4; omit to preserve
+    #[arg(long, value_parser = parse_frame_zoom)]
+    pub zoom: Option<f64>,
+    /// Center the digital crop without changing zoom (unless --zoom is given)
+    #[arg(long, conflicts_with_all = ["x", "y"])]
+    pub center: bool,
+}
+
+fn parse_coordinate(value: &str) -> std::result::Result<f64, String> {
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| "expected a number between 0 and 1".to_string())?;
+    crate::camera::insta360::link2c::coordinate(parsed, "coordinate").map_err(|e| e.to_string())?;
+    Ok(parsed)
+}
+
+fn parse_frame_zoom(value: &str) -> std::result::Result<f64, String> {
+    let parsed = value
+        .parse::<f64>()
+        .map_err(|_| "expected a zoom between 1 and 4".to_string())?;
+    crate::camera::insta360::link2c::zoom_value(parsed).map_err(|e| e.to_string())?;
+    Ok(parsed)
 }
 
 #[derive(Debug, Args)]
@@ -316,6 +351,42 @@ mod tests {
             Some(std::path::Path::new("/dev/video4"))
         );
         assert!(parse(&["--json", "--quiet", "status"]).is_err());
+    }
+
+    #[test]
+    fn digital_frame_arguments() {
+        let c = parse(&["frame"]).unwrap();
+        assert!(matches!(
+            c.command,
+            Command::Frame(FrameArgs {
+                x: None,
+                y: None,
+                zoom: None,
+                center: false,
+            })
+        ));
+        let c = parse(&[
+            "frame", "--x", "0.25", "--y", "0.75", "--zoom", "2", "--json",
+        ])
+        .unwrap();
+        assert!(c.json);
+        assert!(matches!(c.command, Command::Frame(FrameArgs {
+            x: Some(x), y: Some(y), zoom: Some(zoom), center: false,
+        }) if x == 0.25 && y == 0.75 && zoom == 2.0));
+        assert!(parse(&["frame", "--center", "--zoom", "2"]).is_ok());
+        assert!(parse(&["frame", "--center", "--x", "0.5"]).is_err());
+        assert!(parse(&["frame", "--center", "--y", "0.5"]).is_err());
+        for axis in ["--x", "--y"] {
+            for value in ["NaN", "inf", "-0.1", "1.1", "bad"] {
+                assert!(parse(&["frame", axis, value]).is_err());
+            }
+            for value in ["0", "1"] {
+                assert!(parse(&["frame", axis, value]).is_ok());
+            }
+        }
+        for value in ["NaN", "inf", "0", "4.1", "bad"] {
+            assert!(parse(&["frame", "--zoom", value]).is_err());
+        }
     }
 
     #[test]

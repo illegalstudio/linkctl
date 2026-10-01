@@ -3,7 +3,7 @@
 //! These are never run by default:
 //!
 //! ```bash
-//! # read-only checks (safe while the camera is inactive)
+//! # read-only checks (no writes; Link 2C frame readback needs a valid video mode)
 //! cargo test --features hardware-tests -- --ignored readonly
 //!
 //! # movement checks: start `linkctl preview` first, then
@@ -85,6 +85,7 @@ fn readonly_reads_do_not_require_activity() {
         if is_link2c() {
             let (code, _, err) = linkctl(&[cmd]);
             assert_eq!(code, 7, "{err}");
+            assert!(err.contains("linkctl frame"), "{err}");
         } else {
             assert_ok(&[cmd]);
         }
@@ -98,6 +99,22 @@ fn readonly_out_of_range_is_rejected_before_guard() {
     assert_eq!(code, if is_link2c() { 7 } else { 11 }, "{err}");
     let (code, _, err) = linkctl(&["zoom", "9"]);
     assert_eq!(code, 11, "{err}");
+}
+
+/// Requires a Link 2C with normal/tracking/Auto Framing state; sends no writes.
+#[test]
+#[ignore]
+fn readonly_link2c_frame() {
+    if !is_link2c() {
+        return;
+    }
+    let out = assert_ok(&["frame", "--json"]);
+    let frame: serde_json::Value = serde_json::from_str(&out).unwrap();
+    for axis in ["x", "y"] {
+        assert!((0.0..=1.0).contains(&frame[axis].as_f64().unwrap()));
+    }
+    assert!((1.0..=4.0).contains(&frame["zoom"].as_f64().unwrap()));
+    assert!(frame.get("requested").is_none());
 }
 
 /// Requires an active camera (e.g. `linkctl preview` in another terminal).
