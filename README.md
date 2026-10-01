@@ -50,6 +50,8 @@ Python, and never detaches the `uvcvideo` driver.
 | Insta360 Link 2C | `2e1a:4c03` | zoom and image controls; detection and read-only checks validated; no motorized pan/tilt |
 | Insta360 Link (original) | `2e1a:4c01` | recognised, **not tested** |
 
+On the Link 2C, pan/tilt, movement commands (`left`/`right`/`up`/`down`/`center`/`move`) and preset save/load are not supported and exit with code 7 (`UnsupportedControl`), because presets require pan and tilt.
+
 ## Features
 
 * Pan, tilt, zoom in human units (degrees, zoom factor) with device-reported
@@ -241,8 +243,10 @@ Use `--force` only when you intentionally want to bypass this safeguard:
 linkctl --force center
 ```
 
-Read-only commands (`status`, `info`, `devices`, `pan`/`tilt`/`zoom` with
-no argument, `preset save`, `preset list`, `tracking status`) always work.
+Read-only commands (`status`, `info`, `devices`, `zoom` with no argument,
+`preset list`, `tracking status`) always work. Argument-less `pan`/`tilt`
+and `preset save` also work on models with a gimbal; on the Link 2C they
+are not supported and exit with code 7 (`UnsupportedControl`).
 See [docs/activity-detection.md](docs/activity-detection.md) for how
 activity is detected and where it can be wrong.
 

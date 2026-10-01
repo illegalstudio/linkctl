@@ -17,7 +17,8 @@ pub const LINK_PID: u16 = 0x4c01;
 pub enum Model {
     /// Insta360 Link 2 — the primary, hardware-validated target.
     Link2,
-    /// Insta360 Link 2C - shares the Link 2 command protocol.
+    /// Insta360 Link 2C — shares the Link 2 command protocol.
+    #[serde(rename = "link2c")]
     Link2C,
     /// Original Insta360 Link — recognised by VID/PID only; untested.
     Link,
@@ -48,7 +49,7 @@ impl Model {
 
     /// Whether pan/tilt controls represent a physical gimbal.
     pub fn has_gimbal(&self) -> bool {
-        !matches!(self, Model::Link2C)
+        matches!(self, Model::Link2 | Model::Link)
     }
 
     /// Whether this model uses the Link 2 vendor command protocol.
@@ -93,6 +94,9 @@ mod tests {
         assert!(!Model::Link2C.has_gimbal());
         assert!(Model::Link2.has_gimbal());
         assert!(Model::Link.has_gimbal());
+        assert_eq!(serde_json::to_string(&Model::Link2).unwrap(), "\"link2\"");
+        assert_eq!(serde_json::to_string(&Model::Link2C).unwrap(), "\"link2c\"");
+        assert_eq!(serde_json::to_string(&Model::Link).unwrap(), "\"link\"");
     }
 
     #[test]

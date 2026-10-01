@@ -101,9 +101,13 @@ fn readonly_out_of_range_is_rejected_before_guard() {
 }
 
 /// Requires an active camera (e.g. `linkctl preview` in another terminal).
+/// Skipped on the Link 2C (PID 4c03), which has no motorized gimbal.
 #[test]
 #[ignore]
 fn movement_relative_and_center() {
+    if is_link2c() {
+        return;
+    }
     let (code, _, err) = linkctl(&["status", "--json"]);
     assert_eq!(code, 0, "{err}");
     assert_ok(&["right", "5"]);
