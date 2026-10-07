@@ -3,6 +3,7 @@
 
 mod devices;
 mod format;
+mod frame;
 mod image;
 mod info;
 mod motion;
@@ -128,6 +129,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Command::Tilt(a) => motion::tilt(&ctx, a.degrees),
         Command::Move(a) => motion::move_to(&ctx, a.pan, a.tilt),
         Command::Zoom(a) => motion::zoom(&ctx, a.factor),
+        Command::Frame(a) => frame::run(&ctx, &a),
 
         Command::Focus(a) => image::focus(&ctx, a.value),
         Command::Wb(a) => image::white_balance(&ctx, a.value),
