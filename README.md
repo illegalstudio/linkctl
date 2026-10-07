@@ -47,6 +47,7 @@ Python, and never detaches the `uvcvideo` driver.
 | model | USB id | status |
 |-------|--------|--------|
 | Insta360 Link 2 | `2e1a:4c04` | validated on real hardware |
+| Insta360 Link 2 Pro | `2e1a:4c06` | validated on real hardware (detection, `tracking on`/`off`, pan/tilt/zoom; hardware test suite passes) |
 | Insta360 Link 2C | `2e1a:4c03` | image controls and zoom; experimental digital framing; no motorized pan/tilt |
 | Insta360 Link (original) | `2e1a:4c01` | recognised, **not tested** |
 

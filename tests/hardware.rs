@@ -1,4 +1,4 @@
-//! Opt-in hardware tests against a physically connected Insta360 Link 2 or 2C.
+//! Opt-in hardware tests against a physically connected Insta360 Link 2, 2 Pro or 2C.
 //!
 //! These are never run by default:
 //!
