@@ -49,11 +49,12 @@ Python, and never detaches the `uvcvideo` driver.
 | Insta360 Link 2 | `2e1a:4c04` | validated on real hardware |
 | Insta360 Link 2 Pro | `2e1a:4c06` | validated on real hardware (detection, `tracking on`/`off`, pan/tilt/zoom; hardware test suite passes) |
 | Insta360 Link 2C | `2e1a:4c03` | image controls and zoom; experimental digital framing; no motorized pan/tilt |
+| Insta360 Link 2C Pro | `2e1a:4c05` | same code path as Link 2C: image controls and zoom; experimental digital framing; no motorized pan/tilt |
 | Insta360 Link (original) | `2e1a:4c01` | recognised, **not tested** |
 
 ### Link 2C digital framing
 
-Link 2C has no gimbal. Use `frame` to move its digital crop rather than
+Link 2C and Link 2C Pro have no gimbal. Use `frame` to move its digital crop rather than
 `pan`, `tilt`, `left`, `right`, `up`, `down`, `move`, or `center`. Those
 motor commands, and saving/loading pan/tilt presets, are unsupported on 2C
 and exit with code 7 (`UnsupportedControl`), because presets require pan and tilt.

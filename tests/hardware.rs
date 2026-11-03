@@ -1,4 +1,4 @@
-//! Opt-in hardware tests against a physically connected Insta360 Link 2, 2 Pro or 2C.
+//! Opt-in hardware tests against a physically connected Insta360 Link 2, 2 Pro, 2C or 2C Pro.
 //!
 //! These are never run by default:
 //!
@@ -34,10 +34,15 @@ fn assert_ok(args: &[&str]) -> String {
     stdout
 }
 
+/// True for the gimbal-less Link 2C family: Link 2C (4c03) and Link 2C Pro (4c05).
 fn is_link2c() -> bool {
     let out = assert_ok(&["info", "--json"]);
     let info: serde_json::Value = serde_json::from_str(&out).unwrap();
-    info["usb"]["product_id"] == "4c03"
+    is_link2c_pid(&info)
+}
+
+fn is_link2c_pid(info: &serde_json::Value) -> bool {
+    matches!(info["usb"]["product_id"].as_str(), Some("4c03" | "4c05"))
 }
 
 #[test]
@@ -60,7 +65,7 @@ fn readonly_status_and_info() {
     let out = assert_ok(&["info", "--json"]);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["usb"]["vendor_id"], "2e1a");
-    if v["usb"]["product_id"] == "4c03" {
+    if is_link2c_pid(&v) {
         assert!(v["pan_range_degrees"].is_null());
         assert!(v["tilt_range_degrees"].is_null());
     } else {

@@ -10,6 +10,8 @@ pub const LINK2_PID: u16 = 0x4c04;
 pub const LINK2C_PID: u16 = 0x4c03;
 /// USB product id of the Insta360 Link 2 Pro (validated on real hardware).
 pub const LINK2_PRO_PID: u16 = 0x4c06;
+/// USB product id of the Insta360 Link 2C Pro.
+pub const LINK2C_PRO_PID: u16 = 0x4c05;
 /// USB product id of the original Insta360 Link (recognised, **not** tested).
 pub const LINK_PID: u16 = 0x4c01;
 
@@ -26,6 +28,10 @@ pub enum Model {
     /// motorized gimbal; hardware-validated.
     #[serde(rename = "link2pro")]
     Link2Pro,
+    /// Insta360 Link 2C Pro — like the Link 2C: Link 2 command protocol,
+    /// digital framing, no motorized gimbal.
+    #[serde(rename = "link2cpro")]
+    Link2CPro,
     /// Original Insta360 Link — recognised by VID/PID only; untested.
     Link,
 }
@@ -40,6 +46,7 @@ impl Model {
             LINK2_PID => Some(Model::Link2),
             LINK2C_PID => Some(Model::Link2C),
             LINK2_PRO_PID => Some(Model::Link2Pro),
+            LINK2C_PRO_PID => Some(Model::Link2CPro),
             LINK_PID => Some(Model::Link),
             _ => None,
         }
@@ -51,6 +58,7 @@ impl Model {
             Model::Link2 => "Insta360 Link 2",
             Model::Link2C => "Insta360 Link 2C",
             Model::Link2Pro => "Insta360 Link 2 Pro",
+            Model::Link2CPro => "Insta360 Link 2C Pro",
             Model::Link => "Insta360 Link",
         }
     }
@@ -62,7 +70,10 @@ impl Model {
 
     /// Whether this model uses the Link 2 vendor command protocol.
     pub fn supports_link2_protocol(&self) -> bool {
-        matches!(self, Model::Link2 | Model::Link2C | Model::Link2Pro)
+        matches!(
+            self,
+            Model::Link2 | Model::Link2C | Model::Link2Pro | Model::Link2CPro
+        )
     }
 
     /// Whether this model has been validated against physical hardware.
@@ -86,9 +97,11 @@ mod tests {
         assert_eq!(Model::from_usb_ids(0x2e1a, 0x4c04), Some(Model::Link2));
         assert_eq!(Model::from_usb_ids(0x2e1a, 0x4c03), Some(Model::Link2C));
         assert_eq!(Model::from_usb_ids(0x2e1a, 0x4c06), Some(Model::Link2Pro));
+        assert_eq!(Model::from_usb_ids(0x2e1a, 0x4c05), Some(Model::Link2CPro));
         assert_eq!(Model::from_usb_ids(0x2e1a, 0x4c01), Some(Model::Link));
         assert_eq!(Model::from_usb_ids(0x046d, 0x4c03), None);
         assert_eq!(Model::from_usb_ids(0x046d, 0x4c06), None);
+        assert_eq!(Model::from_usb_ids(0x046d, 0x4c05), None);
         assert_eq!(Model::from_usb_ids(0x2e1a, 0x0000), None);
         assert_eq!(Model::from_usb_ids(0x046d, 0x4c04), None);
     }
@@ -123,10 +136,23 @@ mod tests {
     }
 
     #[test]
+    fn link2c_pro_shares_link2_protocol_without_gimbal() {
+        assert!(Model::Link2CPro.supports_link2_protocol());
+        assert!(!Model::Link2CPro.has_gimbal());
+        assert_eq!(Model::Link2CPro.name(), "Insta360 Link 2C Pro");
+        assert_eq!(Model::Link2CPro.to_string(), "Insta360 Link 2C Pro");
+        assert_eq!(
+            serde_json::to_string(&Model::Link2CPro).unwrap(),
+            "\"link2cpro\""
+        );
+    }
+
+    #[test]
     fn only_link2_and_link2_pro_are_tested() {
         assert!(Model::Link2.is_tested());
         assert!(Model::Link2Pro.is_tested());
         assert!(!Model::Link2C.is_tested());
+        assert!(!Model::Link2CPro.is_tested());
         assert!(!Model::Link.is_tested());
         assert_eq!(Model::Link2.name(), "Insta360 Link 2");
     }

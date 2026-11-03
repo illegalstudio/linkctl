@@ -76,8 +76,10 @@ pub fn zoom_value(value: f64) -> Result<u16> {
 }
 
 fn check_units(cam: &Camera) -> Result<()> {
-    if cam.info().model != Model::Link2C {
-        return Err(Error::UnsupportedControl("digital framing (Link 2C only)"));
+    if !matches!(cam.info().model, Model::Link2C | Model::Link2CPro) {
+        return Err(Error::UnsupportedControl(
+            "digital framing (Link 2C and 2C Pro only)",
+        ));
     }
     let descriptors = link2::read_descriptors(&cam.info().usb.sysfs_path)?;
     let units = link2::parse_extension_units(&descriptors);
