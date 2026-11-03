@@ -3,7 +3,7 @@
 //! These are never run by default:
 //!
 //! ```bash
-//! # read-only checks (no writes; Link 2C frame readback needs a valid video mode)
+//! # read-only checks (no writes; Link 2C/2C Pro frame readback needs a valid video mode)
 //! cargo test --features hardware-tests -- --ignored readonly
 //!
 //! # movement checks: start `linkctl preview` first, then
@@ -106,7 +106,7 @@ fn readonly_out_of_range_is_rejected_before_guard() {
     assert_eq!(code, 11, "{err}");
 }
 
-/// Requires a Link 2C with normal/tracking/Auto Framing state; sends no writes.
+/// Requires a Link 2C or 2C Pro with normal/tracking/Auto Framing state; sends no writes.
 #[test]
 #[ignore]
 fn readonly_link2c_frame() {
@@ -123,7 +123,7 @@ fn readonly_link2c_frame() {
 }
 
 /// Requires an active camera (e.g. `linkctl preview` in another terminal).
-/// Skipped on the Link 2C (PID 4c03), which has no motorized gimbal.
+/// Skipped on the Link 2C and 2C Pro (PIDs 4c03, 4c05), which have no motorized gimbal.
 #[test]
 #[ignore]
 fn movement_relative_and_center() {

@@ -146,7 +146,15 @@ impl Camera {
         ))
     }
 
+    /// Current zoom multiplier. On the Link 2C Pro, `zoom_absolute` readback
+    /// misses zoom set through digital framing, so this asks the framing
+    /// state first (a vendor read) and falls back to `zoom_absolute`.
     pub fn zoom_factor(&self) -> Result<f64> {
+        if self.info().model == model::Model::Link2CPro {
+            if let Ok(frame) = insta360::link2c::read(self) {
+                return Ok(frame.zoom_factor());
+            }
+        }
         Ok(units::raw_to_zoom(self.get_raw(Control::ZoomAbsolute)?))
     }
 

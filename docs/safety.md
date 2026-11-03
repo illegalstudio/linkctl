@@ -36,7 +36,7 @@ on the same video node. This has three consequences:
 * the driver serialises our requests with regular control traffic.
 
 Two vendor controls are written: AI tracking on/off (unit 11, selector
-0x02, 1 byte) and Link 2C digital framing (unit 10, selector 0x13, 8 bytes;
+0x02, 1 byte) and Link 2C/2C Pro digital framing (unit 10, selector 0x13, 8 bytes;
 see `link2c-framing.md`). Every vendor write goes through
 `V4l2Device::xu_write`, which requires a static `XuControl` descriptor.
 The write path and its callers enforce:
@@ -48,11 +48,13 @@ The write path and its callers enforce:
    (checked by the tracking/framing code before any write);
 5. the payload preserves current values: tracking uses read-modify-write;
    framing preserves unspecified coordinates from unit 9 mode-state readback
-   and zoom from V4L2, then encodes the fully documented Host PTZ payload;
+   and zoom from V4L2 (on the 2C Pro in normal mode, zoom from the same
+   mode-state readback), then encodes the fully documented Host PTZ payload;
 6. the value is read back afterwards and a mismatch is reported.
 
 Read-only vendor queries (`GET_LEN`, `GET_INFO`, `GET_CUR`) are used for
-diagnostics (`info`, `status`, `tracking status`). The unit-9 "AI mode"
+diagnostics (`info`, `status`, `tracking status`) and framing readback
+(`frame`, and on the 2C Pro also `zoom` with no argument). The unit-9 "AI mode"
 payload is read with the length the device reports because it differs
 between firmware versions (61 bytes documented elsewhere, 60 on the
 development camera). It is never written.

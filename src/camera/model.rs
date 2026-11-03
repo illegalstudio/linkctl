@@ -10,7 +10,7 @@ pub const LINK2_PID: u16 = 0x4c04;
 pub const LINK2C_PID: u16 = 0x4c03;
 /// USB product id of the Insta360 Link 2 Pro (validated on real hardware).
 pub const LINK2_PRO_PID: u16 = 0x4c06;
-/// USB product id of the Insta360 Link 2C Pro.
+/// USB product id of the Insta360 Link 2C Pro (validated on real hardware).
 pub const LINK2C_PRO_PID: u16 = 0x4c05;
 /// USB product id of the original Insta360 Link (recognised, **not** tested).
 pub const LINK_PID: u16 = 0x4c01;
@@ -29,7 +29,7 @@ pub enum Model {
     #[serde(rename = "link2pro")]
     Link2Pro,
     /// Insta360 Link 2C Pro — like the Link 2C: Link 2 command protocol,
-    /// digital framing, no motorized gimbal.
+    /// digital framing, no motorized gimbal; hardware-validated.
     #[serde(rename = "link2cpro")]
     Link2CPro,
     /// Original Insta360 Link — recognised by VID/PID only; untested.
@@ -78,7 +78,7 @@ impl Model {
 
     /// Whether this model has been validated against physical hardware.
     pub fn is_tested(&self) -> bool {
-        matches!(self, Model::Link2 | Model::Link2Pro)
+        matches!(self, Model::Link2 | Model::Link2Pro | Model::Link2CPro)
     }
 }
 
@@ -148,11 +148,11 @@ mod tests {
     }
 
     #[test]
-    fn only_link2_and_link2_pro_are_tested() {
+    fn only_link2_link2_pro_and_link2c_pro_are_tested() {
         assert!(Model::Link2.is_tested());
         assert!(Model::Link2Pro.is_tested());
         assert!(!Model::Link2C.is_tested());
-        assert!(!Model::Link2CPro.is_tested());
+        assert!(Model::Link2CPro.is_tested());
         assert!(!Model::Link.is_tested());
         assert_eq!(Model::Link2.name(), "Insta360 Link 2");
     }

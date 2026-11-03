@@ -72,7 +72,7 @@ pub enum Command {
     /// Set pan and/or tilt absolutely in one command
     Move(MoveArgs),
 
-    /// Show or set Link 2C digital framing (normalized crop center, not degrees)
+    /// Show or set Link 2C and 2C Pro digital framing (normalized crop center, not degrees)
     Frame(FrameArgs),
 
     /// Set zoom multiplier (e.g. 1, 1.5, 2, 4); omit to read
