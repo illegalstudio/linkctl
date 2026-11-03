@@ -56,8 +56,9 @@ assert payload.hex(' ') == 'c8 00 ff 7f ff 7f 14 14'
 This corresponds to 2x zoom and approximately centered X/Y using the SDK's
 truncating normalized-coordinate conversion. There is no separate left/right
 opcode: change X or Y while preserving the other position and zoom values.
-Screen-direction polarity, edge clamping, step timing, and interaction with
-Auto Framing remain to be checked visually on hardware.
+Screen-direction polarity (confirmed on the 2C Pro; see below), edge
+clamping, step timing, and interaction with Auto Framing remain to be checked
+visually on hardware.
 
 The SDK first sends `GET_LEN` (0x85, two-byte result) on the same unit/selector.
 It allocates a zero-filled buffer of that returned length, copies the first
@@ -125,6 +126,53 @@ On the connected Link 2C (2e1a:4c03, /dev/video0):
 The CLI rounds normalized input to the nearest uint16 coordinate rather
 than truncating as the SDK example does: 0.5 encodes to 32768. Unspecified
 coordinates retain their exact raw readback values.
+
+## Link 2C Pro (2e1a:4c05)
+
+The Link 2C Pro has the same extension units (9, 10, and 11, with the same
+GUIDs) and the same X/Y offsets as the Link 2C. Its mode-state payload is 61
+bytes. Baseline, with a stream running, the crop centered at 1x, mode 0x00:
+
+```
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ff 7f
+ff 7f 00 00 00 00 00 00 00 00 64 00 3e fe 22 88 00 00 00 00
+01
+```
+
+Payloads read 3 seconds after explicit `frame --zoom Z --x X --y Y` writes
+differed from the baseline only in bytes 38-41 and 50-51. Byte 0 stayed 0x00.
+
+| write | bytes 38-41 (X, Y) | bytes 50-51 |
+| --- | --- | --- |
+| baseline | `ff 7f ff 7f` | `64 00` (100) |
+| zoom 2, 0.5, 0.5 | `00 80 00 80` | `c8 00` (200) |
+| zoom 2, x 0.25 | `8f 42 00 80` | `c8 00` |
+| zoom 2, x 0.75 | `6f bd 00 80` | `c8 00` |
+| zoom 2, y 0.25 | `00 80 8f 42` | `c8 00` |
+| zoom 2, y 0.75 | `00 80 6f bd` | `c8 00` |
+| zoom 3, 0.5, 0.5 | `00 80 00 80` | `2c 01` (300) |
+
+Zoom times 100 sits at bytes **50..51**, little-endian. A standard V4L2
+`zoom_absolute` write of 2x also set these bytes to `c8 00`. A Host PTZ zoom
+write does not change the `zoom_absolute` readback, so it can read 1x while
+the crop is at 3x. Whether the camera or `uvcvideo` control caching causes
+this is not known. Before linkctl handled it, a partial update such as
+`frame --x 0.25` re-sent the stale 1x zoom and reset the crop.
+
+So on the 2C Pro in mode 0x00, linkctl reads zoom from bytes 50..51 for
+`frame`, `zoom`, and `status`. Only mode 0x00 was captured. In tracking
+(0x01) and Auto Framing (0x07) modes, linkctl reads zoom from V4L2 as
+before, and the value may be stale.
+
+The camera owner watched a live preview. The crop zoomed to 2x, and x 0.25,
+x 0.75, y 0.25, and y 0.75 moved it left, right, up, and down. So X runs left
+to right and Y runs top to bottom. At 2x, 0.25 and 0.75 read back as about
+0.26 and 0.74, likely edge clamping.
+
+The Link 2C probably has the same `zoom_absolute` gap. A 2C owner can check:
+run `linkctl frame --zoom 2 --x 0.5 --y 0.5`, then `linkctl frame --x 0.25`,
+and see whether the crop stays at 2x.
 
 ## Implementation boundary
 

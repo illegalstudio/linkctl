@@ -1,9 +1,9 @@
-//! Opt-in hardware tests against a physically connected Insta360 Link 2, 2 Pro or 2C.
+//! Opt-in hardware tests against a physically connected Insta360 Link 2, 2 Pro, 2C or 2C Pro.
 //!
 //! These are never run by default:
 //!
 //! ```bash
-//! # read-only checks (no writes; Link 2C frame readback needs a valid video mode)
+//! # read-only checks (no writes; Link 2C/2C Pro frame readback needs a valid video mode)
 //! cargo test --features hardware-tests -- --ignored readonly
 //!
 //! # movement checks: start `linkctl preview` first, then
@@ -34,10 +34,15 @@ fn assert_ok(args: &[&str]) -> String {
     stdout
 }
 
+/// True for the gimbal-less Link 2C family: Link 2C (4c03) and Link 2C Pro (4c05).
 fn is_link2c() -> bool {
     let out = assert_ok(&["info", "--json"]);
     let info: serde_json::Value = serde_json::from_str(&out).unwrap();
-    info["usb"]["product_id"] == "4c03"
+    is_link2c_pid(&info)
+}
+
+fn is_link2c_pid(info: &serde_json::Value) -> bool {
+    matches!(info["usb"]["product_id"].as_str(), Some("4c03" | "4c05"))
 }
 
 #[test]
@@ -60,7 +65,7 @@ fn readonly_status_and_info() {
     let out = assert_ok(&["info", "--json"]);
     let v: serde_json::Value = serde_json::from_str(&out).unwrap();
     assert_eq!(v["usb"]["vendor_id"], "2e1a");
-    if v["usb"]["product_id"] == "4c03" {
+    if is_link2c_pid(&v) {
         assert!(v["pan_range_degrees"].is_null());
         assert!(v["tilt_range_degrees"].is_null());
     } else {
@@ -101,7 +106,7 @@ fn readonly_out_of_range_is_rejected_before_guard() {
     assert_eq!(code, 11, "{err}");
 }
 
-/// Requires a Link 2C with normal/tracking/Auto Framing state; sends no writes.
+/// Requires a Link 2C or 2C Pro with normal/tracking/Auto Framing state; sends no writes.
 #[test]
 #[ignore]
 fn readonly_link2c_frame() {
@@ -118,7 +123,7 @@ fn readonly_link2c_frame() {
 }
 
 /// Requires an active camera (e.g. `linkctl preview` in another terminal).
-/// Skipped on the Link 2C (PID 4c03), which has no motorized gimbal.
+/// Skipped on the Link 2C and 2C Pro (PIDs 4c03, 4c05), which have no motorized gimbal.
 #[test]
 #[ignore]
 fn movement_relative_and_center() {

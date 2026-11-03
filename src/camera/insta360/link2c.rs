@@ -1,4 +1,4 @@
-//! Link 2C digital crop positioning. Protocol evidence: docs/link2c-framing.md.
+//! Link 2C and 2C Pro digital crop positioning. Protocol evidence: docs/link2c-framing.md.
 
 use super::link2::{self, guid, AI_MODE_STATUS, XU_IMAGE_UNIT, XU_INFO_UNIT};
 use super::xu::XuControl;
@@ -76,8 +76,10 @@ pub fn zoom_value(value: f64) -> Result<u16> {
 }
 
 fn check_units(cam: &Camera) -> Result<()> {
-    if cam.info().model != Model::Link2C {
-        return Err(Error::UnsupportedControl("digital framing (Link 2C only)"));
+    if !matches!(cam.info().model, Model::Link2C | Model::Link2CPro) {
+        return Err(Error::UnsupportedControl(
+            "digital framing (Link 2C and 2C Pro only)",
+        ));
     }
     let descriptors = link2::read_descriptors(&cam.info().usb.sysfs_path)?;
     let units = link2::parse_extension_units(&descriptors);
@@ -106,14 +108,30 @@ fn decode_mode(bytes: &[u8], zoom: u16) -> Result<Frame> {
     })
 }
 
+/// Zoom x100 from the Link 2C Pro mode payload (bytes 50-51, LE). On the
+/// 2C Pro, V4L2 `zoom_absolute` readback misses zoom set through Host PTZ.
+/// Verified in normal mode (0x00) only; `None` means use `zoom_absolute`.
+fn payload_zoom(model: Model, bytes: &[u8]) -> Option<u16> {
+    if model != Model::Link2CPro || bytes.len() < 52 || bytes[0] != 0 {
+        return None;
+    }
+    Some(u16::from_le_bytes([bytes[50], bytes[51]]))
+}
+
 pub fn read(cam: &Camera) -> Result<Frame> {
     check_units(cam)?;
     let bytes = cam
         .device()
         .xu_read_reported(AI_MODE_STATUS.unit, AI_MODE_STATUS.selector)?;
-    let zoom = cam.get_raw(crate::camera::controls::Control::ZoomAbsolute)?;
-    let zoom = u16::try_from(zoom)
-        .map_err(|_| Error::Vendor(format!("unexpected frame zoom readback: {zoom}")))?;
+    let zoom = match payload_zoom(cam.info().model, &bytes) {
+        Some(zoom) => zoom,
+        // Not `Camera::zoom_factor()`: it calls `read()` on the 2C Pro.
+        None => {
+            let zoom = cam.get_raw(crate::camera::controls::Control::ZoomAbsolute)?;
+            u16::try_from(zoom)
+                .map_err(|_| Error::Vendor(format!("unexpected frame zoom readback: {zoom}")))?
+        }
+    };
     decode_mode(&bytes, zoom)
 }
 
@@ -194,6 +212,54 @@ mod tests {
         }
         assert!(decode_mode(&[0; 56], 0).is_err());
         assert!(decode_mode(&[0; 56], 401).is_err());
+    }
+
+    /// Link 2C Pro mode payload as captured (docs/link2c-framing.md), with
+    /// the X/Y bytes (38-41) and zoom bytes (50-51) under test.
+    fn captured(xy: [u8; 4], zoom: [u8; 2]) -> [u8; 61] {
+        let mut bytes = [0; 61];
+        bytes[38..42].copy_from_slice(&xy);
+        bytes[50..52].copy_from_slice(&zoom);
+        bytes[52..56].copy_from_slice(&[0x3e, 0xfe, 0x22, 0x88]);
+        bytes[60] = 1;
+        bytes
+    }
+
+    fn decode_2c_pro(bytes: &[u8]) -> Result<Frame> {
+        decode_mode(bytes, payload_zoom(Model::Link2CPro, bytes).unwrap())
+    }
+
+    #[test]
+    fn decodes_captured_2c_pro_payloads() {
+        let frame = decode_2c_pro(&captured([0xff, 0x7f, 0xff, 0x7f], [0x64, 0])).unwrap();
+        assert_eq!((frame.x, frame.y, frame.zoom), (0x7fff, 0x7fff, 100));
+        let frame = decode_2c_pro(&captured([0x8f, 0x42, 0x00, 0x80], [0xc8, 0])).unwrap();
+        assert_eq!((frame.x, frame.y, frame.zoom), (0x428f, 0x8000, 200));
+        let frame = decode_2c_pro(&captured([0x00, 0x80, 0x00, 0x80], [0x2c, 0x01])).unwrap();
+        assert_eq!((frame.x, frame.y, frame.zoom), (0x8000, 0x8000, 300));
+    }
+
+    #[test]
+    fn payload_zoom_only_for_2c_pro_in_normal_mode() {
+        let baseline = captured([0xff, 0x7f, 0xff, 0x7f], [0x64, 0]);
+        for len in 0..52 {
+            assert_eq!(payload_zoom(Model::Link2CPro, &baseline[..len]), None);
+        }
+        assert_eq!(payload_zoom(Model::Link2CPro, &baseline[..52]), Some(100));
+        for mode in [1, 7, 0xff] {
+            let mut bytes = baseline;
+            bytes[0] = mode;
+            assert_eq!(payload_zoom(Model::Link2CPro, &bytes), None);
+        }
+        assert_eq!(payload_zoom(Model::Link2C, &baseline), None);
+    }
+
+    #[test]
+    fn payload_zoom_range_is_enforced() {
+        for (zoom, ok) in [(99u16, false), (100, true), (400, true), (401, false)] {
+            let bytes = captured([0xff, 0x7f, 0xff, 0x7f], zoom.to_le_bytes());
+            assert_eq!(decode_2c_pro(&bytes).is_ok(), ok, "zoom {zoom}");
+        }
     }
 
     #[test]

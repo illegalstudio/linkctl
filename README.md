@@ -49,13 +49,14 @@ Python, and never detaches the `uvcvideo` driver.
 | Insta360 Link 2 | `2e1a:4c04` | validated on real hardware |
 | Insta360 Link 2 Pro | `2e1a:4c06` | validated on real hardware (detection, `tracking on`/`off`, pan/tilt/zoom; hardware test suite passes) |
 | Insta360 Link 2C | `2e1a:4c03` | image controls and zoom; experimental digital framing; no motorized pan/tilt |
+| Insta360 Link 2C Pro | `2e1a:4c05` | validated on real hardware (detection, `zoom`, `frame` with live-preview check, `tracking on`/`off`; read-only hardware tests pass); no motorized pan/tilt |
 | Insta360 Link (original) | `2e1a:4c01` | recognised, **not tested** |
 
-### Link 2C digital framing
+### Link 2C and 2C Pro digital framing
 
-Link 2C has no gimbal. Use `frame` to move its digital crop rather than
+Link 2C and Link 2C Pro have no gimbal. Use `frame` to move their digital crop rather than
 `pan`, `tilt`, `left`, `right`, `up`, `down`, `move`, or `center`. Those
-motor commands, and saving/loading pan/tilt presets, are unsupported on 2C
+motor commands, and saving/loading pan/tilt presets, are unsupported on the 2C and 2C Pro
 and exit with code 7 (`UnsupportedControl`), because presets require pan and tilt.
 
 ```sh
@@ -75,21 +76,25 @@ extension-unit GUID, eight-byte payload length, and SET capability. Only
 normal/tracking/Auto Framing mode-state layouts are decoded. Other modes
 or idle firmware may report that framing state is unavailable.
 
+On the 2C Pro in tracking or Auto Framing mode, a partial update keeps the
+zoom from V4L2, which may be stale; pass `--zoom` explicitly there.
+
 Output reports readback, not merely the requested values, with a warning
 if the camera has not confirmed the change. Auto Framing can override manual
 positioning; disable it if the crop will not stay where requested.
 
 Detection, coordinate readback, and command length/capability queries have
 been verified on a physical Link 2C. Digital framing writes have also been
-confirmed working by the camera owner in manual testing. Edge clamping,
-direction polarity, and interaction with Auto Framing still need broader
-validation. See [protocol details](docs/link2c-framing.md).
+confirmed working by the camera owner in manual testing. On a physical
+Link 2C Pro, the owner confirmed direction: X runs left to right, Y runs top
+to bottom. Edge clamping, direction on the Link 2C, and interaction with Auto
+Framing still need broader validation. See [protocol details](docs/link2c-framing.md).
 
 ## Features
 
 * Pan, tilt, zoom in human units (degrees, zoom factor) with device-reported
   ranges, absolute and relative.
-* Experimental Link 2C digital crop positioning with `frame --x/--y/--zoom`.
+* Experimental Link 2C and 2C Pro digital crop positioning with `frame --x/--y/--zoom`.
 * Focus, white balance, brightness, contrast, saturation, sharpness, hue.
 * Framing presets stored in a TOML config file.
 * Resolution, pixel format (MJPEG/H.264) and frame rate: list what the
@@ -279,7 +284,7 @@ linkctl --force center
 
 Read-only commands (`status`, `info`, `devices`, `zoom` with no argument,
 `preset list`, `tracking status`) always work. Argument-less `pan`/`tilt`
-and `preset save` also work on models with a gimbal; on the Link 2C they
+and `preset save` also work on models with a gimbal; on the Link 2C and 2C Pro they
 are not supported and exit with code 7 (`UnsupportedControl`).
 See [docs/activity-detection.md](docs/activity-detection.md) for how
 activity is detected and where it can be wrong.
@@ -321,7 +326,7 @@ linkctl pan [DEGREES]          absolute pan, negative = left; no arg reads
 linkctl tilt [DEGREES]         absolute tilt, negative = down; no arg reads
 linkctl move --pan 30 --tilt -10
 
-linkctl frame [--x X --y Y --zoom FACTOR | --center]  Link 2C digital crop
+linkctl frame [--x X --y Y --zoom FACTOR | --center]  Link 2C/2C Pro digital crop
 linkctl zoom [FACTOR]          1 .. 4 on the Link 2
 linkctl focus auto|VALUE
 linkctl wb auto|KELVIN
@@ -522,8 +527,8 @@ Check your device permissions or group membership.
 
 * Standard V4L2 controls are the normal path and are validated against the
   device's own ranges.
-* Vendor writes are limited to documented AI tracking and Link 2C digital
-  framing controls; see [protocol details](docs/link2c-framing.md).
+* Vendor writes are limited to documented AI tracking and Link 2C/2C Pro
+  digital framing controls; see [protocol details](docs/link2c-framing.md).
 * The AI tracking write is a reversible, 1-byte control
   and go through read → validate (`GET_LEN`, `GET_INFO`, GUID) → write →
   read-back.
